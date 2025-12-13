@@ -5,9 +5,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.minecraft.client.Minecraft;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tech.tnze.msctf.Source;
-import tech.tnze.msctf.ThreadManager;
-import tech.tnze.msctf.UIElementSink;
+import tech.tnze.msctf.*;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,6 +19,7 @@ public class IMEClient implements ClientModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     public static ThreadManager mThreadManager = null;
+    public static UIElementManager mUIElementManager = null;
     public static int mClientId = 0;
 
     @Override
@@ -38,13 +37,20 @@ public class IMEClient implements ClientModInitializer {
         mClientId = mThreadManager.activateEx(ThreadManager.TF_TMAE_UIELEMENTENABLEDONLY);
         LOGGER.debug("Activated TSF with ClientID={}", mClientId);
 
+        mUIElementManager = mThreadManager.getUIElementManager();
+        LOGGER.debug("Obtained ITfUIElementMgr");
+
         try (Source source = mThreadManager.getSource()) {
             LOGGER.info("Registering UIElementSink");
             source.adviseSink(new UIElementSink() {
                 @Override
                 public boolean begin(int uiElementId) {
-                    LOGGER.info("UIElement Begin: ID={}", uiElementId);
-                    return true;
+                    try (UIElement element = mUIElementManager.getUIElement(uiElementId)) {
+                        LOGGER.info("UIElement Begin: ID={} DESC={} GUID={}", uiElementId, element.getDescription(), element.getGUID());
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                    return false;
                 }
 
                 @Override

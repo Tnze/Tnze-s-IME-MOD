@@ -37,6 +37,8 @@ public class ThreadManager implements AutoCloseable {
 
     public native DocumentManager createDocumentManager();
 
+    public native UIElementManager getUIElementManager();
+
     public native void enumDocumentManagers(Consumer<DocumentManager> consumer);
 
     @Override

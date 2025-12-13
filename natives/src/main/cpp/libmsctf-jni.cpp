@@ -5,6 +5,7 @@
 #include <winrt/base.h>
 
 #pragma comment(lib, "ole32.lib")
+#pragma comment(lib, "oleaut32.lib")
 
 extern "C" static jthrowable HRESULT_TO_EXCEPTION(JNIEnv *env, const char *message_utf, HRESULT hr)
 {
@@ -43,7 +44,7 @@ Java_tech_tnze_msctf_ThreadManager_createInstance(JNIEnv *env, jclass clazz)
 {
     HRESULT ret;
     ITfThreadMgr *pTfThreadMgr;
-    ret = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    ret = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
     if (FAILED(ret))
     {
         env->Throw(HRESULT_TO_EXCEPTION(env, "CoInitializeEx", ret));
@@ -179,6 +180,26 @@ Java_tech_tnze_msctf_ThreadManager_createDocumentManager(JNIEnv *env, jobject th
         reinterpret_cast<jlong>(docMgr));
 }
 
+extern "C" JNIEXPORT jobject JNICALL
+Java_tech_tnze_msctf_ThreadManager_getUIElementManager(JNIEnv *env, jobject thiz)
+{
+    HRESULT ret;
+    ITfUIElementMgr *uiElemMgr;
+    ITfThreadMgr *threadMgr = reinterpret_cast<ITfThreadMgr *>(env->GetLongField(thiz, env->GetFieldID(env->GetObjectClass(thiz), "pointer", "J")));
+
+    ret = threadMgr->QueryInterface(IID_PPV_ARGS(&uiElemMgr));
+    if (FAILED(ret))
+    {
+        env->Throw(HRESULT_TO_EXCEPTION(env, "QueryInterface(ITfUIElementMgr)", ret));
+        return NULL;
+    }
+    jclass sourceClazz = env->FindClass("tech/tnze/msctf/UIElementManager");
+    return env->NewObject(
+        sourceClazz,
+        env->GetMethodID(sourceClazz, "<init>", "(J)V"),
+        reinterpret_cast<jlong>(uiElemMgr));
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_tech_tnze_msctf_ThreadManager_enumDocumentManagers(JNIEnv *env, jobject thiz, jobject consumer)
 {
@@ -229,51 +250,72 @@ class JniUiElementSink : public ITfUIElementSink
 public:
     JniUiElementSink(JNIEnv *env, jobject ref)
         : refCount(1),
-          env(env),
-          global_ref(env->NewGlobalRef(ref))
+          global_ref(env->NewGlobalRef(ref)),
+          global_clz(static_cast<jclass>(env->NewGlobalRef(env->GetObjectClass(global_ref))))
     {
-        jclass clazz = env->GetObjectClass(global_ref);
-        beginId = env->GetMethodID(clazz, "begin", "(I)Z");
-        updateId = env->GetMethodID(clazz, "update", "(I)V");
-        endId = env->GetMethodID(clazz, "end", "(I)V");
+        beginId = env->GetMethodID(global_clz, "begin", "(I)Z");
+        updateId = env->GetMethodID(global_clz, "update", "(I)V");
+        endId = env->GetMethodID(global_clz, "end", "(I)V");
+
+        env->GetJavaVM(&jvm);
     }
 
     HRESULT STDMETHODCALLTYPE BeginUIElement(
         /* [in] */ DWORD dwUIElementId,
         /* [out][in] */ BOOL *pbShow) override
     {
-        jboolean ret = env->CallBooleanMethod(global_ref, beginId, static_cast<jint>(dwUIElementId));
+        JNIEnv *env;
+        jvm->AttachCurrentThread(reinterpret_cast<void **>(&env), NULL);
+
+        jboolean show = env->CallBooleanMethod(global_ref, beginId, static_cast<jint>(dwUIElementId));
+        HRESULT ret = S_OK;
         if (env->ExceptionCheck())
         {
             env->ExceptionClear();
-            return E_FAIL;
+            ret = E_FAIL;
         }
-        *pbShow = static_cast<BOOL>(ret);
-        return S_OK;
+        else
+        {
+            *pbShow = static_cast<BOOL>(show);
+        }
+
+        jvm->DetachCurrentThread();
+        return ret;
     }
 
     HRESULT STDMETHODCALLTYPE UpdateUIElement(
         /* [in] */ DWORD dwUIElementId) override
     {
+        JNIEnv *env;
+        jvm->AttachCurrentThread(reinterpret_cast<void **>(&env), NULL);
+
         env->CallVoidMethod(global_ref, updateId, static_cast<jint>(dwUIElementId));
+        HRESULT ret = S_OK;
         if (env->ExceptionCheck())
         {
             env->ExceptionClear();
-            return E_FAIL;
+            ret = E_FAIL;
         }
-        return S_OK;
+
+        jvm->DetachCurrentThread();
+        return ret;
     }
 
     HRESULT STDMETHODCALLTYPE EndUIElement(
         /* [in] */ DWORD dwUIElementId) override
     {
+        JNIEnv *env;
+        jvm->AttachCurrentThread(reinterpret_cast<void **>(&env), NULL);
         env->CallVoidMethod(global_ref, endId, static_cast<jint>(dwUIElementId));
+        HRESULT ret = S_OK;
         if (env->ExceptionCheck())
         {
             env->ExceptionClear();
-            return E_FAIL;
+            ret = E_FAIL;
         }
-        return S_OK;
+
+        jvm->DetachCurrentThread();
+        return ret;
     }
 
     HRESULT STDMETHODCALLTYPE QueryInterface(
@@ -313,78 +355,20 @@ public:
 
 private:
     ULONG refCount;
-    JNIEnv *env;
+    JavaVM *jvm;
     jobject global_ref;
+    jclass global_clz;
     jmethodID beginId, updateId, endId;
 
     ~JniUiElementSink()
     {
+        JNIEnv *env;
+        jvm->AttachCurrentThread(reinterpret_cast<void **>(&env), NULL);
+        env->DeleteGlobalRef(global_clz);
         env->DeleteGlobalRef(global_ref);
+        jvm->DetachCurrentThread();
     }
 };
-
-// struct JniUiElementSink
-//     : winrt::implements<JniUiElementSink, ITfUIElementSink>
-// {
-// private:
-//     JNIEnv *env;
-//     jobject global_ref;
-//     jmethodID beginId, updateId, endId;
-
-// public:
-//     JniUiElementSink(JNIEnv *env, jobject ref)
-//         : env(env),
-//           global_ref(env->NewGlobalRef(ref))
-//     {
-//         jclass clazz = env->GetObjectClass(global_ref);
-//         beginId = env->GetMethodID(clazz, "begin", "(I)Z");
-//         updateId = env->GetMethodID(clazz, "update", "(I)V");
-//         endId = env->GetMethodID(clazz, "end", "(I)V");
-//     }
-
-//     ~JniUiElementSink()
-//     {
-//         env->DeleteGlobalRef(global_ref);
-//     }
-
-//     HRESULT STDMETHODCALLTYPE BeginUIElement(
-//         /* [in] */ DWORD dwUIElementId,
-//         /* [out][in] */ BOOL *pbShow)
-//     {
-//         jboolean ret = env->CallBooleanMethod(global_ref, beginId, static_cast<jint>(dwUIElementId));
-//         if (env->ExceptionCheck())
-//         {
-//             env->ExceptionClear();
-//             return E_FAIL;
-//         }
-//         *pbShow = static_cast<BOOL>(ret);
-//         return S_OK;
-//     }
-
-//     HRESULT STDMETHODCALLTYPE UpdateUIElement(
-//         /* [in] */ DWORD dwUIElementId)
-//     {
-//         env->CallVoidMethod(global_ref, updateId, static_cast<jint>(dwUIElementId));
-//         if (env->ExceptionCheck())
-//         {
-//             env->ExceptionClear();
-//             return E_FAIL;
-//         }
-//         return S_OK;
-//     }
-
-//     HRESULT STDMETHODCALLTYPE EndUIElement(
-//         /* [in] */ DWORD dwUIElementId)
-//     {
-//         env->CallVoidMethod(global_ref, endId, static_cast<jint>(dwUIElementId));
-//         if (env->ExceptionCheck())
-//         {
-//             env->ExceptionClear();
-//             return E_FAIL;
-//         }
-//         return S_OK;
-//     }
-// };
 
 extern "C" JNIEXPORT void JNICALL
 Java_tech_tnze_msctf_Source_releaseInstance(JNIEnv *env, jclass clazz, jlong p)
@@ -420,66 +404,154 @@ Java_tech_tnze_msctf_Source_unadviseSink(JNIEnv *env, jobject thiz, jint cookie)
     }
 }
 
-struct JniContextOwnerCompositionSink : public ITfContextOwnerCompositionSink
+extern "C" JNIEXPORT jobject JNICALL
+Java_tech_tnze_msctf_UIElementManager_getUIElement(JNIEnv *env, jobject thiz, jint uiElementId)
 {
+    ITfUIElement *element;
+    ITfUIElementMgr *uiElementMgr = reinterpret_cast<ITfUIElementMgr *>(env->GetLongField(thiz, env->GetFieldID(env->GetObjectClass(thiz), "pointer", "J")));
+    HRESULT ret = uiElementMgr->GetUIElement(static_cast<DWORD>(uiElementId), &element);
+    if (FAILED(ret))
+    {
+        env->Throw(HRESULT_TO_EXCEPTION(env, "GetUIElement", ret));
+        return nullptr;
+    }
 
+    jclass uiElemClazz = env->FindClass("tech/tnze/msctf/UIElement");
+    return env->NewObject(
+        uiElemClazz,
+        env->GetMethodID(uiElemClazz, "<init>", "(J)V"),
+        reinterpret_cast<jlong>(element));
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_tech_tnze_msctf_UIElementManager_close(JNIEnv *env, jobject thiz)
+{
+    reinterpret_cast<ITfUIElementMgr *>(env->GetLongField(thiz, env->GetFieldID(env->GetObjectClass(thiz), "pointer", "J")))->Release();
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_tech_tnze_msctf_UIElement_getDescription(JNIEnv *env, jobject thiz)
+{
+    BSTR desc;
+    ITfUIElement *uiElement = reinterpret_cast<ITfUIElement *>(env->GetLongField(thiz, env->GetFieldID(env->GetObjectClass(thiz), "pointer", "J")));
+    HRESULT ret = uiElement->GetDescription(&desc);
+    if (FAILED(ret))
+    {
+        env->Throw(HRESULT_TO_EXCEPTION(env, "GetDescription", ret));
+        return nullptr;
+    }
+
+    static_assert(sizeof(wchar_t) == sizeof(jchar));
+    return env->NewString(reinterpret_cast<const jchar *>(desc), SysStringLen(desc));
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_tech_tnze_msctf_UIElement_getGUID(JNIEnv *env, jobject thiz)
+{
+    GUID guid;
+    OLECHAR str[39];
+    ITfUIElement *uiElement = reinterpret_cast<ITfUIElement *>(env->GetLongField(thiz, env->GetFieldID(env->GetObjectClass(thiz), "pointer", "J")));
+    HRESULT ret = uiElement->GetGUID(&guid);
+    if (FAILED(ret))
+    {
+        env->Throw(HRESULT_TO_EXCEPTION(env, "GetGUID", ret));
+        return nullptr;
+    }
+
+    int len = StringFromGUID2(guid, str, _countof(str));
+    return env->NewString(reinterpret_cast<const jchar *>(str), static_cast<jsize>(len) - 1);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_tech_tnze_msctf_UIElement_close(JNIEnv *env, jobject thiz)
+{
+    reinterpret_cast<ITfUIElement *>(env->GetLongField(thiz, env->GetFieldID(env->GetObjectClass(thiz), "pointer", "J")))->Release();
+}
+
+class JniContextOwnerCompositionSink : public ITfContextOwnerCompositionSink
+{
 public:
     JniContextOwnerCompositionSink(JNIEnv *env, jobject ref)
-        : env(env),
-          global_ref(env->NewGlobalRef(ref))
+        : global_ref(env->NewGlobalRef(ref)),
+          global_clz(static_cast<jclass>(env->NewGlobalRef(env->GetObjectClass(global_ref)))),
+          compositionClazz(static_cast<jclass>(env->NewGlobalRef(env->FindClass("tech/tnze/msctf/CompositionView")))),
+          rangeClazz(static_cast<jclass>(env->NewGlobalRef(env->FindClass("tech/tnze/msctf/Range"))))
     {
-        jclass clazz = env->GetObjectClass(global_ref);
-        startId = env->GetMethodID(clazz, "onStartComposition", "(Ltech/tnze/msctf/CompositionView;)Z");
-        updateId = env->GetMethodID(clazz, "onUpdateComposition", "(Ltech/tnze/msctf/CompositionView;Ltech/tnze/msctf/Range;)V");
-        endId = env->GetMethodID(clazz, "onEndComposition", "(Ltech/tnze/msctf/CompositionView;)V");
+        startId = env->GetMethodID(global_clz, "onStartComposition", "(Ltech/tnze/msctf/CompositionView;)Z");
+        updateId = env->GetMethodID(global_clz, "onUpdateComposition", "(Ltech/tnze/msctf/CompositionView;Ltech/tnze/msctf/Range;)V");
+        endId = env->GetMethodID(global_clz, "onEndComposition", "(Ltech/tnze/msctf/CompositionView;)V");
 
-        compositionClazz = env->FindClass("tech/tnze/msctf/CompositionView");
         compositionNew = env->GetMethodID(compositionClazz, "<init>", "(J)V");
+        rangeNew = env->GetMethodID(rangeClazz, "<init>", "(J)V");
+
+        jint ret = env->GetJavaVM(&jvm);
     }
 
     HRESULT STDMETHODCALLTYPE OnStartComposition(
-        /* [in] */ __RPC__in_opt ITfCompositionView *pComposition,
-        /* [out] */ __RPC__out BOOL *pfOk)
+        /* [in] */ ITfCompositionView *pComposition,
+        /* [out] */ BOOL *pfOk)
     {
+        JNIEnv *env;
+        jvm->AttachCurrentThread(reinterpret_cast<void **>(&env), NULL);
+
         pComposition->AddRef();
         jobject composition = env->NewObject(compositionClazz, compositionNew, reinterpret_cast<jlong>(pComposition));
         jboolean ok = env->CallBooleanMethod(global_ref, startId, composition);
         *pfOk = static_cast<BOOL>(ok);
+        *pfOk = TRUE;
+        HRESULT ret = S_OK;
         if (env->ExceptionCheck())
         {
             env->ExceptionClear();
-            return E_FAIL;
+            ret = E_FAIL;
         }
-        return S_OK;
+
+        jvm->DetachCurrentThread();
+        return ret;
     }
 
     HRESULT STDMETHODCALLTYPE OnUpdateComposition(
-        /* [in] */ __RPC__in_opt ITfCompositionView *pComposition,
-        /* [in] */ __RPC__in_opt ITfRange *pRangeNew)
+        /* [in] */ ITfCompositionView *pComposition,
+        /* [in] */ ITfRange *pRangeNew)
     {
+        JNIEnv *env;
+        jvm->AttachCurrentThread(reinterpret_cast<void **>(&env), NULL);
+
         pComposition->AddRef();
         jobject composition = env->NewObject(compositionClazz, compositionNew, reinterpret_cast<jlong>(pComposition));
-        env->CallVoidMethod(global_ref, updateId, composition);
+        jobject range = env->NewObject(rangeClazz, rangeNew, reinterpret_cast<jlong>(pRangeNew));
+        env->CallVoidMethod(global_ref, updateId, composition, range);
+
+        HRESULT ret = S_OK;
         if (env->ExceptionCheck())
         {
             env->ExceptionClear();
-            return E_FAIL;
+            ret = E_FAIL;
         }
-        return S_OK;
+
+        jvm->DetachCurrentThread();
+        return ret;
     }
 
     HRESULT STDMETHODCALLTYPE OnEndComposition(
-        /* [in] */ __RPC__in_opt ITfCompositionView *pComposition)
+        /* [in] */ ITfCompositionView *pComposition)
     {
+        JNIEnv *env;
+        jvm->AttachCurrentThread(reinterpret_cast<void **>(&env), NULL);
+
         pComposition->AddRef();
         jobject composition = env->NewObject(compositionClazz, compositionNew, reinterpret_cast<jlong>(pComposition));
         env->CallVoidMethod(global_ref, endId, composition);
+
+        HRESULT ret = S_OK;
         if (env->ExceptionCheck())
         {
             env->ExceptionClear();
-            return E_FAIL;
+            ret = E_FAIL;
         }
-        return S_OK;
+
+        jvm->DetachCurrentThread();
+        return ret;
     }
 
     HRESULT STDMETHODCALLTYPE QueryInterface(
@@ -519,15 +591,18 @@ public:
 
 private:
     ULONG refCount;
-    JNIEnv *env;
+    JavaVM *jvm;
     jobject global_ref;
-    jclass compositionClazz;
-    jmethodID compositionNew;
+    jclass global_clz, compositionClazz, rangeClazz;
+    jmethodID compositionNew, rangeNew;
     jmethodID startId, updateId, endId;
 
     ~JniContextOwnerCompositionSink()
     {
+        JNIEnv *env;
+        jvm->AttachCurrentThread(reinterpret_cast<void **>(&env), NULL);
         env->DeleteGlobalRef(global_ref);
+        jvm->DetachCurrentThread();
     }
 };
 
