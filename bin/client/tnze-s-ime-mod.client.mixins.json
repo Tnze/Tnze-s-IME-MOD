@@ -4,6 +4,8 @@
   "package": "tech.tnze.mixin.client",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "MinecraftMixin",
+    "EditBoxMixin"
   ],
   "injectors": {
     "defaultRequire": 1

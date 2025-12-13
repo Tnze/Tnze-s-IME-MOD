@@ -1,6 +1,8 @@
 package tech.tnze.client;
 
+import com.mojang.blaze3d.platform.Window;
 import net.fabricmc.api.ClientModInitializer;
+import net.minecraft.client.Minecraft;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tech.tnze.msctf.Source;
@@ -42,7 +44,7 @@ public class IMEClient implements ClientModInitializer {
                 @Override
                 public boolean begin(int uiElementId) {
                     LOGGER.info("UIElement Begin: ID={}", uiElementId);
-                    return false;
+                    return true;
                 }
 
                 @Override

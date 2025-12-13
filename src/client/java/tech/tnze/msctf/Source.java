@@ -24,4 +24,9 @@ public class Source implements AutoCloseable {
     public void close() {
         releaseInstance(pointer);
     }
+
+    @Override
+    public String toString() {
+        return "ITfSource@" + Long.toHexString(pointer);
+    }
 }

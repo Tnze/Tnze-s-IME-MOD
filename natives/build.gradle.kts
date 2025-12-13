@@ -8,6 +8,12 @@ group = "tech.tnze"
 version = "1.0-SNAPSHOT"
 
 val javaHome: String = System.getProperty("java.home")
+val windowsKits = File("C:/Program Files (x86)/Windows Kits/10/Include")
+val latestSdk = windowsKits.listFiles()
+    ?.filter { it.isDirectory }
+    ?.filter { it.name.startsWith("10.") }
+    ?.maxByOrNull { it.name }
+print(latestSdk)
 
 library {
     baseName = "msctf-jni"
@@ -15,12 +21,11 @@ library {
 
     publicHeaders.setFrom(
         Paths.get(javaHome, "include", "win32"),
-        Paths.get(javaHome, "include")
+        Paths.get(javaHome, "include"),
+        latestSdk?.let { Paths.get(it.path, "cppwinrt") }
     )
-
-//    source.setFrom("src/main/cpp")
 }
 
-//tasks.withType<CppCompile> {
-//    compilerArgs.add("/utf-8")
-//}
+tasks.withType<CppCompile> {
+    compilerArgs.add("/std:c++latest")
+}
