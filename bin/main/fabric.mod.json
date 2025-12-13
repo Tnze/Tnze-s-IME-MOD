@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "tnze-s-ime-mod",
+  "version": "${version}",
+  "name": "Tnze's IME mod",
+  "description": "Tnze's IME support mod for Minecraft",
+  "authors": [],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/tnze-s-ime-mod/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "tech.tnze.client.IMEClient"
+    ],
+    "main": [
+      "tech.tnze.IME"
+    ]
+  },
+  "mixins": [
+    "tnze-s-ime-mod.mixins.json",
+    {
+      "config": "tnze-s-ime-mod.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
