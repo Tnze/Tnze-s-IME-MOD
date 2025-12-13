@@ -12,6 +12,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 
 public class IMEClient implements ClientModInitializer {
     public static final String MOD_ID = "tnze-s-ime-mod";
@@ -45,17 +46,33 @@ public class IMEClient implements ClientModInitializer {
             source.adviseSink(new UIElementSink() {
                 @Override
                 public boolean begin(int uiElementId) {
-                    try (UIElement element = mUIElementManager.getUIElement(uiElementId)) {
-                        LOGGER.info("UIElement Begin: ID={} DESC={} GUID={}", uiElementId, element.getDescription(), element.getGUID());
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
+                    LOGGER.info("UIElement BEGIN: ID={}", uiElementId);
                     return false;
                 }
 
                 @Override
                 public void update(int uiElementId) {
-                    LOGGER.info("UIElement UPDATE: ID={}", uiElementId);
+                    try (UIElement element = mUIElementManager.getUIElement(uiElementId)) {
+                        LOGGER.info("UIElement UPDATE: ID={} DESC={} GUID={}", uiElementId, element.getDescription(), element.getGUID());
+                        try (CandidateListUIElement candidateUI = element.intoCandidateListUIElement()) {
+                            if (candidateUI != null) {
+                                int count = candidateUI.getCount();
+                                int pageCount = candidateUI.getPageIndex(null);
+                                int[] indexes = new int[pageCount];
+                                pageCount = candidateUI.getPageIndex(indexes);
+                                LOGGER.info("Candidate count={} [{}]{}", count, pageCount, indexes);
+
+                                int pageSize = pageCount > 1 ? indexes[1] : count;
+                                String[] page = new String[indexes[1]];
+                                for (int i = 0; i < pageSize; i++) {
+                                    page[i] = candidateUI.getString(i);
+                                }
+                                LOGGER.info("Candidate list: {}", Arrays.toString(page));
+                            }
+                        }
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
                 }
 
                 @Override
