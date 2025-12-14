@@ -21,7 +21,7 @@ public abstract class MinecraftMixin {
     public abstract Window getWindow();
 
     @Inject(method = "<init>(Lnet/minecraft/client/main/GameConfig;)V", at = @At("TAIL"))
-    private void constructor(GameConfig gameConfig, CallbackInfo ci) {
+    private void tnze$initTextServiceFramework(GameConfig gameConfig, CallbackInfo ci) {
         long winHandle = GLFWNativeWin32.glfwGetWin32Window(getWindow().handle());
         LOGGER.debug("Window handle: {}", winHandle);
 

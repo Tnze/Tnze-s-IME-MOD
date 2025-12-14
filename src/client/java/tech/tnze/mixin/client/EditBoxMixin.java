@@ -10,7 +10,7 @@ import tech.tnze.client.IMEClient;
 @Mixin(EditBox.class)
 public class EditBoxMixin {
     @Inject(method = "setFocused(Z)V", at = @At("TAIL"))
-    public void tnzeSetFocused(boolean focused, CallbackInfo ci) {
+    public void tnze$setFocused(boolean focused, CallbackInfo ci) {
         IMEClient.LOGGER.info("EditBox focused state changed: {}", focused);
     }
 }

@@ -14,8 +14,8 @@ import tech.tnze.client.Manager;
 @Mixin(Screen.class)
 public class ScreenMixin {
 
-    @Inject(method = "render(Lnet/minecraft/client/gui/GuiGraphics;IIF)V", at = @At("TAIL"))
-    private void renderCandidateList(GuiGraphics guiGraphics, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+    @Inject(method = "renderWithTooltipAndSubtitles(Lnet/minecraft/client/gui/GuiGraphics;IIF)V", at = @At("TAIL"))
+    private void tnze$renderCandidateList(GuiGraphics guiGraphics, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         Manager.uiElements.forEach((id, elem) -> elem.render(guiGraphics, mouseX, mouseY, delta));
     }
 
