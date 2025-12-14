@@ -26,15 +26,15 @@ public abstract class MinecraftMixin {
         LOGGER.debug("Window handle: {}", winHandle);
 
         DocumentManager docManager = mThreadManager.createDocumentManager();
-        DocumentManager prevDocManager = mThreadManager.associateFocus(winHandle, docManager);
-        if (prevDocManager != null) {
-            LOGGER.warn("Previous document manager should be null, got {}", prevDocManager);
-            try {
-                prevDocManager.close();
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
+//        DocumentManager prevDocManager = mThreadManager.associateFocus(winHandle, docManager);
+//        if (prevDocManager != null) {
+//            LOGGER.warn("Previous document manager should be null, got {}", prevDocManager);
+//            try {
+//                prevDocManager.close();
+//            } catch (Exception e) {
+//                throw new RuntimeException(e);
+//            }
+//        }
 
         Context ctx = docManager.createContext(IMEClient.mClientId, 0, new ContextOwnerCompositionSink() {
             @Override

@@ -8,9 +8,14 @@ public class UIElement implements AutoCloseable {
     }
 
     public native String getDescription();
+
     public native String getGUID();
 
     public native CandidateListUIElement intoCandidateListUIElement();
+
+    public native ToolTipUIElement intoToolTipUIElement();
+
+    public native TransitoryExtensionUIElement intoTransitoryExtensionUIElement();
 
     @Override
     public native void close() throws Exception;

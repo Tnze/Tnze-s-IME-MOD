@@ -54,6 +54,42 @@ Java_tech_tnze_msctf_UIElement_intoCandidateListUIElement(JNIEnv *env, jobject t
         reinterpret_cast<jlong>(target));
 }
 
+extern "C" JNIEXPORT jobject JNICALL
+Java_tech_tnze_msctf_UIElement_intoToolTipUIElement(JNIEnv *env, jobject thiz)
+{
+    ITfToolTipUIElement *target;
+    ITfUIElement *uiElement = reinterpret_cast<ITfUIElement *>(env->GetLongField(thiz, env->GetFieldID(env->GetObjectClass(thiz), "pointer", "J")));
+    HRESULT ret = uiElement->QueryInterface(IID_PPV_ARGS(&target));
+    if (FAILED(ret))
+    {
+        return nullptr;
+    }
+
+    jclass clz = env->FindClass("tech/tnze/msctf/ToolTipUIElement");
+    return env->NewObject(
+        clz,
+        env->GetMethodID(clz, "<init>", "(J)V"),
+        reinterpret_cast<jlong>(target));
+}
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_tech_tnze_msctf_UIElement_intoTransitoryExtensionUIElement(JNIEnv *env, jobject thiz)
+{
+    ITfTransitoryExtensionUIElement *target;
+    ITfUIElement *uiElement = reinterpret_cast<ITfUIElement *>(env->GetLongField(thiz, env->GetFieldID(env->GetObjectClass(thiz), "pointer", "J")));
+    HRESULT ret = uiElement->QueryInterface(IID_PPV_ARGS(&target));
+    if (FAILED(ret))
+    {
+        return nullptr;
+    }
+
+    jclass clz = env->FindClass("tech/tnze/msctf/TransitoryExtensionUIElement");
+    return env->NewObject(
+        clz,
+        env->GetMethodID(clz, "<init>", "(J)V"),
+        reinterpret_cast<jlong>(target));
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_tech_tnze_msctf_UIElement_close(JNIEnv *env, jobject thiz)
 {

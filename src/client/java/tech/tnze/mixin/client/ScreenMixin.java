@@ -16,7 +16,9 @@ public class ScreenMixin {
 
     @Inject(method = "renderWithTooltipAndSubtitles(Lnet/minecraft/client/gui/GuiGraphics;IIF)V", at = @At("TAIL"))
     private void tnze$renderCandidateList(GuiGraphics guiGraphics, int mouseX, int mouseY, float delta, CallbackInfo ci) {
-        Manager.uiElements.forEach((id, elem) -> elem.render(guiGraphics, mouseX, mouseY, delta));
+        synchronized (Manager.uiElements) {
+            Manager.uiElements.forEach((id, elem) -> elem.render(guiGraphics, mouseX, mouseY, delta));
+        }
     }
 
 }

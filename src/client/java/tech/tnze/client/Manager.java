@@ -1,10 +1,9 @@
 package tech.tnze.client;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.util.Util;
-import tech.tnze.msctf.CandidateListUIElement;
-import tech.tnze.msctf.UIElement;
-import tech.tnze.msctf.UIElementSink;
+import tech.tnze.msctf.*;
 
 import static tech.tnze.client.IMEClient.LOGGER;
 import static tech.tnze.client.IMEClient.mUIElementManager;
@@ -12,69 +11,122 @@ import static tech.tnze.client.IMEClient.mUIElementManager;
 import java.util.*;
 
 public class Manager implements UIElementSink {
-    public static TreeMap<Integer, CandidateList> uiElements = new TreeMap<>();
+    public static final TreeMap<Integer, Renderable> uiElements = new TreeMap<>();
 
     @Override
     public boolean begin(int uiElementId) {
         LOGGER.debug("BeginUIElement: ID={}", uiElementId);
-        try (UIElement element = mUIElementManager.getUIElement(uiElementId);
-             CandidateListUIElement candidateUI = element.intoCandidateListUIElement()) {
-            if (candidateUI == null) {
-                LOGGER.debug("Unknown element, allowing Text Service display its UI");
-                return true;
-            }
-            Util.backgroundExecutor().execute(() -> {
-                CandidateList pre = uiElements.put(uiElementId, new CandidateList(Minecraft.getInstance()));
-                if (pre != null) {
-                    LOGGER.warn("Duplicate UIElement registered, what happened?");
+        try (UIElement element = mUIElementManager.getUIElement(uiElementId)) {
+
+            CandidateListUIElement candidateList = element.intoCandidateListUIElement();
+            if (candidateList != null) {
+                try (candidateList) {
+                    synchronized (uiElements) {
+                        Renderable pre = uiElements.put(uiElementId, new CandidateList(Minecraft.getInstance()));
+                        if (pre != null) {
+                            LOGGER.warn("Duplicate UIElement registered, what happened?");
+                        }
+                    }
                 }
-            });
+                return false;
+            }
+
+            ToolTipUIElement toolTip = element.intoToolTipUIElement();
+            if (toolTip != null) {
+                try (toolTip) {
+                    synchronized (uiElements) {
+                        LOGGER.info("Add ToolTip {}", uiElementId);
+                        // TODO: Create UI
+                    }
+                }
+                return false;
+            }
+
+            TransitoryExtensionUIElement transitoryExtension = element.intoTransitoryExtensionUIElement();
+            if (transitoryExtension != null) {
+                try (transitoryExtension) {
+                    synchronized (uiElements) {
+                        LOGGER.info("Add TransitoryExtension {}", uiElementId);
+                        // TODO: Create UI
+                    }
+                }
+                return false;
+            }
+
+            LOGGER.warn("Unknown UIElement: DESC={}, GUID={}", element.getDescription(), element.getGUID());
         } catch (Exception e) {
             LOGGER.error("Failed to get UIElement {} on BeginUIElement", uiElementId);
         }
-        return false;
+        return true;
     }
 
     @Override
     public void update(int uiElementId) {
+        LOGGER.debug("UIElement UPDATE: ID={}", uiElementId);
         try (UIElement element = mUIElementManager.getUIElement(uiElementId)) {
-            LOGGER.debug("UIElement UPDATE: ID={} DESC={} GUID={}", uiElementId, element.getDescription(), element.getGUID());
-            try (CandidateListUIElement candidateUI = element.intoCandidateListUIElement()) {
-                if (candidateUI == null) {
-                    return;
-                }
-                int totalCount = candidateUI.getCount();
-                int currentPage = candidateUI.getCurrentPage();
-                int currentSelection = candidateUI.getSelection();
-                int[] indexes = new int[candidateUI.getPageIndex(null)];
-                int pageCount = candidateUI.getPageIndex(indexes);
-                LOGGER.debug("Candidate count={} [{}]{}", totalCount, pageCount, indexes);
 
-                int currPageStart = indexes[currentPage];
-                int currPageEnd = (currentPage + 1) < pageCount ? indexes[currentPage + 1] : totalCount;
-                int currPageSize = currPageEnd - currPageStart;
-                String[] currentPageContent = new String[currPageSize];
-                for (int i = 0; i < currPageSize; i++) {
-                    currentPageContent[i] = candidateUI.getString(currPageStart + i);
-                }
+            CandidateListUIElement candidateList = element.intoCandidateListUIElement();
+            if (candidateList != null) {
+                try (candidateList) {
+                    int totalCount = candidateList.getCount();
+                    int currentPage = candidateList.getCurrentPage();
+                    int currentSelection = candidateList.getSelection();
+                    int[] indexes = new int[candidateList.getPageIndex(null)];
+                    int pageCount = candidateList.getPageIndex(indexes);
+                    LOGGER.debug("Candidate count={} [{}]{}", totalCount, pageCount, indexes);
 
-                Util.backgroundExecutor().execute(() -> {
-                    CandidateList list = uiElements.get(uiElementId);
-                    if (list == null) {
-                        LOGGER.warn("Updating an unexist CandidateList");
-                        return;
+                    int currPageStart = indexes[currentPage];
+                    int currPageEnd = (currentPage + 1) < pageCount ? indexes[currentPage + 1] : totalCount;
+                    int currPageSize = currPageEnd - currPageStart;
+                    String[] currentPageContent = new String[currPageSize];
+                    for (int i = 0; i < currPageSize; i++) {
+                        currentPageContent[i] = candidateList.getString(currPageStart + i);
                     }
-                    list.setState(totalCount, pageCount, currentPage, currentPageContent, currentSelection - currPageStart);
-                });
+
+                    synchronized (uiElements) {
+                        Renderable list = uiElements.get(uiElementId);
+                        if (list == null) {
+                            LOGGER.warn("Updating an unexist CandidateList");
+                            return;
+                        }
+                        if (list instanceof CandidateList) {
+                            ((CandidateList) list).setState(totalCount, pageCount, currentPage, currentPageContent, currentSelection - currPageStart);
+                        } else {
+                            LOGGER.warn("Not updating a CandidateList, element id underlying type changed?");
+                        }
+                    }
+                }
+                return;
             }
+
+            ToolTipUIElement toolTip = element.intoToolTipUIElement();
+            if (toolTip != null) {
+                try (toolTip) {
+                    LOGGER.info("ToolTip: {}", toolTip.getString());
+                }
+                return;
+            }
+
+
+            TransitoryExtensionUIElement transitoryExtension = element.intoTransitoryExtensionUIElement();
+            if (transitoryExtension != null) {
+                try (transitoryExtension) {
+                    LOGGER.info("TransitoryExtension {}", uiElementId);
+                }
+                return;
+            }
+
+            LOGGER.warn("Unknown UIElement DESC={}, GUID={}", element.getDescription(), element.getGUID());
         } catch (Exception e) {
-            LOGGER.error("Failed to get UIElement {} on UpdateUIElement", uiElementId);
+            LOGGER.error("Failed to get UIElement {} on UpdateUIElement: {}", uiElementId, e);
         }
     }
 
     @Override
     public void end(int uiElementId) {
         LOGGER.debug("EndUIElement: ID={}", uiElementId);
-        Util.backgroundExecutor().execute(() -> uiElements.remove(uiElementId));
+        synchronized (uiElements) {
+            uiElements.remove(uiElementId);
+        }
     }
 }
