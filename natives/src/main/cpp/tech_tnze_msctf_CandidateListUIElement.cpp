@@ -58,6 +58,20 @@ Java_tech_tnze_msctf_CandidateListUIElement_getPageIndex(JNIEnv *env, jobject th
     return static_cast<jint>(count);
 }
 
+extern "C" JNIEXPORT jint JNICALL
+Java_tech_tnze_msctf_CandidateListUIElement_getSelection(JNIEnv *env, jobject thiz)
+{
+    UINT selection;
+    ITfCandidateListUIElement *elem = reinterpret_cast<ITfCandidateListUIElement *>(env->GetLongField(thiz, env->GetFieldID(env->GetObjectClass(thiz), "pointer", "J")));
+    HRESULT ret = elem->GetSelection(&selection);
+    if (FAILED(ret))
+    {
+        env->Throw(HRESULT_TO_EXCEPTION(env, "GetSelection", ret));
+        return 0;
+    }
+    return static_cast<jint>(selection);
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_tech_tnze_msctf_CandidateListUIElement_getString(JNIEnv *env, jobject thiz, jint index)
 {

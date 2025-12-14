@@ -22,8 +22,7 @@ public abstract class MinecraftMixin {
 
     @Inject(method = "<init>(Lnet/minecraft/client/main/GameConfig;)V", at = @At("TAIL"))
     private void constructor(GameConfig gameConfig, CallbackInfo ci) {
-        long winHandle = getWindow().handle();
-        winHandle = GLFWNativeWin32.glfwGetWin32Window(winHandle);
+        long winHandle = GLFWNativeWin32.glfwGetWin32Window(getWindow().handle());
         LOGGER.debug("Window handle: {}", winHandle);
 
         DocumentManager docManager = mThreadManager.createDocumentManager();

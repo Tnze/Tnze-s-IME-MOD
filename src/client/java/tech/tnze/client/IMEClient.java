@@ -1,8 +1,11 @@
 package tech.tnze.client;
 
+import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.platform.Window;
 import net.fabricmc.api.ClientModInitializer;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tech.tnze.msctf.*;
@@ -42,44 +45,8 @@ public class IMEClient implements ClientModInitializer {
         LOGGER.debug("Obtained ITfUIElementMgr");
 
         try (Source source = mThreadManager.getSource()) {
-            LOGGER.info("Registering UIElementSink");
-            source.adviseSink(new UIElementSink() {
-                @Override
-                public boolean begin(int uiElementId) {
-                    LOGGER.info("UIElement BEGIN: ID={}", uiElementId);
-                    return false;
-                }
-
-                @Override
-                public void update(int uiElementId) {
-                    try (UIElement element = mUIElementManager.getUIElement(uiElementId)) {
-                        LOGGER.info("UIElement UPDATE: ID={} DESC={} GUID={}", uiElementId, element.getDescription(), element.getGUID());
-                        try (CandidateListUIElement candidateUI = element.intoCandidateListUIElement()) {
-                            if (candidateUI != null) {
-                                int count = candidateUI.getCount();
-                                int pageCount = candidateUI.getPageIndex(null);
-                                int[] indexes = new int[pageCount];
-                                pageCount = candidateUI.getPageIndex(indexes);
-                                LOGGER.info("Candidate count={} [{}]{}", count, pageCount, indexes);
-
-                                int pageSize = pageCount > 1 ? indexes[1] : count;
-                                String[] page = new String[indexes[1]];
-                                for (int i = 0; i < pageSize; i++) {
-                                    page[i] = candidateUI.getString(i);
-                                }
-                                LOGGER.info("Candidate list: {}", Arrays.toString(page));
-                            }
-                        }
-                    } catch (Exception e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-
-                @Override
-                public void end(int uiElementId) {
-                    LOGGER.info("UIElement END: ID={}", uiElementId);
-                }
-            });
+            source.adviseSink(new Manager());
+            LOGGER.info("Registered UIElementSink");
         }
     }
 

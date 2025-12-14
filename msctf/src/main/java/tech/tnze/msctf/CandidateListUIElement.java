@@ -8,9 +8,12 @@ public class CandidateListUIElement implements AutoCloseable {
     }
 
     public native int getCount();
+
     public native int getCurrentPage();
+
     public native int getPageIndex(int[] indexes);
-    public native void setPageIndex(int index, int pageCount);
+
+    public native int getSelection();
 
     public native String getString(int index);
 
