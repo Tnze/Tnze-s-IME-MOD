@@ -9,3 +9,4 @@ pluginManagement {
 }
 
 include("natives")
+include("msctf")

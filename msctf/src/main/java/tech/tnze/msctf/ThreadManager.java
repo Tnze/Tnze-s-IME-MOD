@@ -1,13 +1,9 @@
 package tech.tnze.msctf;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.function.Consumer;
 
 public class ThreadManager implements AutoCloseable {
     private final long pointer;
-    public static final Logger LOGGER = LoggerFactory.getLogger("iTfThreadMgr");
 
     public static final int TF_TMAE_NOACTIVATETIP = 0x00000001;
     public static final int TF_TMAE_SECUREMODE = 0x00000002;
