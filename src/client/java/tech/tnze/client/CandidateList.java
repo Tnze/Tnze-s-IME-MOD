@@ -6,15 +6,19 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.renderer.Rect2i;
 
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 import org.jspecify.annotations.NonNull;
 
 public class CandidateList implements Renderable {
 
     private final Minecraft minecraft;
-    private final int[] paddings = new int[]{2, 2, 1, 1};
+    private final int[] paddings = new int[]{3, 3, 2, 2};
     private final int screenMargin = 4;
     int totalCount, pageCount, currentPage, currentSelection;
-    private String[] currentPageContent = new String[0];
+    private MutableComponent displayComponent = Component.empty();
+    private final Style selectedItemStyle = Style.EMPTY.withColor(0xFFFFFF00).withUnderlined(true);
 
     int anchorX, anchorY;
 
@@ -32,12 +36,27 @@ public class CandidateList implements Renderable {
         this.totalCount = totalCount;
         this.pageCount = pageCount;
         this.currentPage = currentPage;
-        this.currentPageContent = currentPageContent;
         this.currentSelection = currentSelection;
 
+        MutableComponent list = Component.empty();
+        StringBuilder sb = new StringBuilder();
         for (int i = 0; i < currentPageContent.length; i++) {
-            currentPageContent[i] = (i + 1) + ". " + currentPageContent[i];
+            if (i != 0) {
+                list.append(" ");
+            }
+
+            sb.setLength(0);
+            sb.append(i + 1);
+            sb.append(".");
+            sb.append(currentPageContent[i]);
+
+            MutableComponent item = Component.literal(sb.toString());
+            if (i == currentSelection) {
+                item.withStyle(selectedItemStyle);
+            }
+            list.append(item);
         }
+        displayComponent = list;
     }
 
     public void setAnchor(int x, int y) {
@@ -68,28 +87,11 @@ public class CandidateList implements Renderable {
     public void render(@NonNull GuiGraphics gg, int mouseX, int mouseY, float delta) {
         setAnchor(mouseX, mouseY); // TODO: Debug only
 
-        // Calculate display size
         Font font = minecraft.font;
-        int totalWidth = 0;
-        for (String s : currentPageContent) {
-            totalWidth += font.width(s) + 5;
-        }
+        Rect2i rect = relocate(font.width(displayComponent), font.lineHeight, gg.guiWidth(), gg.guiHeight());
 
-        Rect2i rect = relocate(totalWidth, font.lineHeight, gg.guiWidth(), gg.guiHeight());
         renderBackground(gg, rect);
-
-        int offsetX = 0;
-        for (int i = 0; i < currentPageContent.length; i++) {
-            int width = font.width(currentPageContent[i]);
-            gg.drawString(
-                    font,
-                    currentPageContent[i],
-                    rect.getX() + offsetX,
-                    rect.getY(),
-                    currentSelection == i ? 0xFFFFFF00 : 0xFFE0E0E0
-            );
-            offsetX += width + 5;
-        }
+        gg.drawString(font, displayComponent, rect.getX(), rect.getY(), 0xFFE0E0E0);
     }
 
     private void renderBackground(@NonNull GuiGraphics gg, Rect2i bounds) {
