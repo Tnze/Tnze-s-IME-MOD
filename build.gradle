@@ -19,6 +19,8 @@ loom {
             sourceSet sourceSets.client
         }
     }
+
+    log4jConfigs.from file("src/main/resources/log4j.xml")
 }
 
 repositories {
@@ -52,8 +54,8 @@ processResources {
                 "loader_version": project.loader_version
     }
 
-    dependsOn(":natives:assembleDebug")
-    from(project(":natives").layout.buildDirectory.dir("lib/main/debug")) {
+    dependsOn(":natives:assembleRelease")
+    from(project(":natives").layout.buildDirectory.dir("lib/main/release")) {
         include("*.dll")
         into("natives")
     }

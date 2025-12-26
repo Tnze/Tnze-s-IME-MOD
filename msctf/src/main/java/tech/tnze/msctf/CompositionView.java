@@ -7,6 +7,10 @@ public class CompositionView implements AutoCloseable {
         pointer = p;
     }
 
+    public native String getOwnerClsid();
+
+    public native Range getRange();
+
     @Override
     public native void close() throws Exception;
 

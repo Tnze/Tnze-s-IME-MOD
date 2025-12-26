@@ -1,14 +1,35 @@
 #include "tech_tnze_msctf_Source.h"
 #include "tech_tnze_msctf_UIElementSink.h"
+#include "tech_tnze_msctf_ContextOwner.h"
 #include "util.h"
 
 extern "C" JNIEXPORT jint JNICALL
-Java_tech_tnze_msctf_Source_adviceUIElementSink(JNIEnv *env, jobject thiz, jobject uiElementSink)
+Java_tech_tnze_msctf_Source_adviceUIElementSink(JNIEnv *env, jobject thiz, jobject javaSink)
 {
     DWORD cookie;
     ITfSource *source = reinterpret_cast<ITfSource *>(env->GetLongField(thiz, env->GetFieldID(env->GetObjectClass(thiz), "pointer", "J")));
-    JniUiElementSink *sink = new JniUiElementSink(env, uiElementSink);
-    HRESULT ret = source->AdviseSink(IID_ITfUIElementSink, sink, &cookie);
+    IUnknown *sink;
+    HRESULT ret;
+    sink = new JniUiElementSink(env, javaSink);
+    ret = source->AdviseSink(IID_ITfUIElementSink, sink, &cookie);
+    if (FAILED(ret))
+    {
+        env->Throw(HRESULT_TO_EXCEPTION(env, "AdviseSink", ret));
+        return 0;
+    }
+    sink->Release();
+    return static_cast<jint>(cookie);
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_tech_tnze_msctf_Source_adviceContextOwner(JNIEnv *env, jobject thiz, jobject javaSink)
+{
+    DWORD cookie;
+    ITfSource *source = reinterpret_cast<ITfSource *>(env->GetLongField(thiz, env->GetFieldID(env->GetObjectClass(thiz), "pointer", "J")));
+    IUnknown *sink;
+    HRESULT ret;
+    sink = new JniContextOwner(env, javaSink);
+    ret = source->AdviseSink(IID_ITfUIElementSink, sink, &cookie);
     if (FAILED(ret))
     {
         env->Throw(HRESULT_TO_EXCEPTION(env, "AdviseSink", ret));

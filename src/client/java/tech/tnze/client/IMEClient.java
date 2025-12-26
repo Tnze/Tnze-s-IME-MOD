@@ -1,11 +1,6 @@
 package tech.tnze.client;
 
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.Window;
 import net.fabricmc.api.ClientModInitializer;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.Identifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tech.tnze.msctf.*;
@@ -15,7 +10,6 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.Arrays;
 
 public class IMEClient implements ClientModInitializer {
     public static final String MOD_ID = "tnze-s-ime-mod";
@@ -34,20 +28,6 @@ public class IMEClient implements ClientModInitializer {
         loadNativeLibrary();
         LOGGER.debug("Load native library success");
 
-        // Create ITfThreadMgr instance
-        mThreadManager = new ThreadManager();
-        LOGGER.debug("Create ITfThreadMgr success");
-
-        mClientId = mThreadManager.activateEx(ThreadManager.TF_TMAE_UIELEMENTENABLEDONLY);
-        LOGGER.debug("Activated TSF with ClientID={}", mClientId);
-
-        mUIElementManager = mThreadManager.getUIElementManager();
-        LOGGER.debug("Obtained ITfUIElementMgr");
-
-        try (Source source = mThreadManager.getSource()) {
-            source.adviseSink(new Manager());
-            LOGGER.info("Registered UIElementSink");
-        }
     }
 
     private void loadNativeLibrary() {

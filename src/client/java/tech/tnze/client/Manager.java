@@ -1,17 +1,34 @@
 package tech.tnze.client;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Renderable;
-import net.minecraft.util.Util;
 import tech.tnze.msctf.*;
 
 import static tech.tnze.client.IMEClient.LOGGER;
 import static tech.tnze.client.IMEClient.mUIElementManager;
 
+import java.lang.ref.Cleaner;
 import java.util.*;
 
-public class Manager implements UIElementSink {
+public class Manager implements UIElementSink, ContextOwnerCompositionSink { // TODO: Implement ItfContextOwner and ITfTransitoryExtensionSink
     public static final TreeMap<Integer, Renderable> uiElements = new TreeMap<>();
+    public static final HashMap<EditBox, DocumentManager> documentManagers = new HashMap<>();
+    public static final Cleaner mDocumentCleaner = Cleaner.create();
+
+    private int editCookie = 0;
+
+    private static Manager instance = null;
+
+    public synchronized static Manager getInstance() {
+        if (instance == null) {
+            instance = new Manager();
+        }
+        return instance;
+    }
+
+    private Manager() {
+    }
 
     @Override
     public boolean begin(int uiElementId) {
@@ -127,6 +144,32 @@ public class Manager implements UIElementSink {
         LOGGER.debug("EndUIElement: ID={}", uiElementId);
         synchronized (uiElements) {
             uiElements.remove(uiElementId);
+        }
+    }
+
+    public void setEditCookie(int cookie) {
+        editCookie = cookie;
+    }
+
+    @Override
+    public boolean onStartComposition(CompositionView composition) {
+        LOGGER.info("Start composition");
+        return true;
+    }
+
+    @Override
+    public void onUpdateComposition(CompositionView composition, Range range) {
+        LOGGER.info("Update composition: {}", range != null ? range.getText(editCookie) : null);
+    }
+
+    @Override
+    public void onEndComposition(CompositionView composition) {
+        LOGGER.info("End composition: {}", composition.getOwnerClsid());
+        try (Range range = composition.getRange()) {
+            LOGGER.info("End composition: {}", range);
+//            LOGGER.info("End composition: {}", range.getText(editCookie));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 }

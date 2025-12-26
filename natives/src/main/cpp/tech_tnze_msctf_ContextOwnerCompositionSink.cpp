@@ -31,6 +31,7 @@ HRESULT STDMETHODCALLTYPE JniContextOwnerCompositionSink::OnStartComposition(
     HRESULT ret = S_OK;
     if (env->ExceptionCheck())
     {
+        env->ExceptionDescribe();
         env->ExceptionClear();
         ret = E_FAIL;
     }
@@ -48,12 +49,13 @@ HRESULT STDMETHODCALLTYPE JniContextOwnerCompositionSink::OnUpdateComposition(
 
     pComposition->AddRef();
     jobject composition = env->NewObject(compositionClazz, compositionNew, reinterpret_cast<jlong>(pComposition));
-    jobject range = env->NewObject(rangeClazz, rangeNew, reinterpret_cast<jlong>(pRangeNew));
+    jobject range = pRangeNew ? env->NewObject(rangeClazz, rangeNew, reinterpret_cast<jlong>(pRangeNew)) : nullptr;
     env->CallVoidMethod(global_ref, updateId, composition, range);
 
     HRESULT ret = S_OK;
     if (env->ExceptionCheck())
     {
+        env->ExceptionDescribe();
         env->ExceptionClear();
         ret = E_FAIL;
     }
@@ -75,6 +77,7 @@ HRESULT STDMETHODCALLTYPE JniContextOwnerCompositionSink::OnEndComposition(
     HRESULT ret = S_OK;
     if (env->ExceptionCheck())
     {
+        env->ExceptionDescribe();
         env->ExceptionClear();
         ret = E_FAIL;
     }

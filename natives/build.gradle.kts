@@ -29,4 +29,5 @@ library {
 tasks.withType<CppCompile> {
     dependsOn(":msctf:build")
     compilerArgs.add("/std:c++latest")
+//    compilerArgs.add("/fsanitize=address")
 }

@@ -9,6 +9,12 @@ public class Context implements AutoCloseable {
         editCookie = ec;
     }
 
+    public int getEditCookie() {
+        return editCookie;
+    }
+
+    public native Source getSource();
+
     @Override
     public native void close() throws Exception;
 

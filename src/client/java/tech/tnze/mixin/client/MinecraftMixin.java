@@ -10,6 +10,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import tech.tnze.client.IMEClient;
+import tech.tnze.client.Manager;
 import tech.tnze.msctf.*;
 
 import static tech.tnze.client.IMEClient.mThreadManager;
@@ -22,40 +23,29 @@ public abstract class MinecraftMixin {
 
     @Inject(method = "<init>(Lnet/minecraft/client/main/GameConfig;)V", at = @At("TAIL"))
     private void tnze$initTextServiceFramework(GameConfig gameConfig, CallbackInfo ci) {
+
+        // Create ITfThreadMgr instance
+        mThreadManager = new ThreadManager();
+        LOGGER.debug("Create ITfThreadMgr success");
+
+        IMEClient.mClientId = mThreadManager.activateEx(ThreadManager.TF_TMAE_UIELEMENTENABLEDONLY);
+        LOGGER.debug("Activated TSF with ClientID={}", IMEClient.mClientId);
+
+        IMEClient.mUIElementManager = mThreadManager.getUIElementManager();
+        LOGGER.debug("Obtained ITfUIElementMgr");
+
+        try (Source source = mThreadManager.getSource()) {
+            source.adviseSink(Manager.getInstance());
+            LOGGER.info("Registered UIElementSink");
+        }
+
         long winHandle = GLFWNativeWin32.glfwGetWin32Window(getWindow().handle());
         LOGGER.debug("Window handle: {}", winHandle);
 
-        DocumentManager docManager = mThreadManager.createDocumentManager();
-//        DocumentManager prevDocManager = mThreadManager.associateFocus(winHandle, docManager);
-//        if (prevDocManager != null) {
-//            LOGGER.warn("Previous document manager should be null, got {}", prevDocManager);
-//            try {
-//                prevDocManager.close();
-//            } catch (Exception e) {
-//                throw new RuntimeException(e);
-//            }
-//        }
-
-        Context ctx = docManager.createContext(IMEClient.mClientId, 0, new ContextOwnerCompositionSink() {
-            @Override
-            public boolean onStartComposition(CompositionView composition) {
-                LOGGER.info("Start composition");
-                return true;
-            }
-
-            @Override
-            public void onUpdateComposition(CompositionView composition, Range range) {
-                LOGGER.info("Update composition");
-            }
-
-            @Override
-            public void onEndComposition(CompositionView composition) {
-                LOGGER.info("End composition");
-            }
-        });
-        LOGGER.info("IME Context: {}", ctx);
-
-        docManager.push(ctx);
-        LOGGER.info("Pushed Context: {}", ctx);
+        try(DocumentManager oldDocMgr = mThreadManager.associateFocus(winHandle, null)) {
+            LOGGER.debug("Old DocumentManager: {}", oldDocMgr);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

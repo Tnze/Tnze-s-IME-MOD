@@ -34,13 +34,6 @@ Java_tech_tnze_msctf_WindowsException_getOsMessage(JNIEnv *env, jobject thiz)
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_tech_tnze_msctf_CompositionView_close(JNIEnv *env, jobject thiz)
-{
-    ITfCompositionView *v = reinterpret_cast<ITfCompositionView *>(env->GetLongField(thiz, env->GetFieldID(env->GetObjectClass(thiz), "pointer", "J")));
-    v->Release();
-}
-
-extern "C" JNIEXPORT void JNICALL
 Java_tech_tnze_msctf_Context_close(JNIEnv *env, jobject thiz)
 {
     ITfContext *context = reinterpret_cast<ITfContext *>(env->GetLongField(thiz, env->GetFieldID(env->GetObjectClass(thiz), "pointer", "J")));

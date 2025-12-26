@@ -7,15 +7,8 @@
 extern "C" JNIEXPORT jlong JNICALL
 Java_tech_tnze_msctf_ThreadManager_createInstance(JNIEnv *env, jclass clazz)
 {
-    HRESULT ret;
     ITfThreadMgr *pTfThreadMgr;
-    ret = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-    if (FAILED(ret))
-    {
-        env->Throw(HRESULT_TO_EXCEPTION(env, "CoInitializeEx", ret));
-        return 0;
-    }
-    ret = CoCreateInstance(CLSID_TF_ThreadMgr, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pTfThreadMgr));
+    HRESULT ret = CoCreateInstance(CLSID_TF_ThreadMgr, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pTfThreadMgr));
     if (FAILED(ret))
     {
         env->Throw(HRESULT_TO_EXCEPTION(env, "CoCreateInstance", ret));
@@ -73,9 +66,13 @@ exit:
 extern "C" JNIEXPORT jobject JNICALL
 Java_tech_tnze_msctf_ThreadManager_associateFocus(JNIEnv *env, jobject thiz, jlong winHandle, jobject documentManager)
 {
-    jclass docManagerClazz = env->GetObjectClass(documentManager);
+    jclass docManagerClazz = env->FindClass("tech/tnze/msctf/DocumentManager");
     ITfThreadMgr *threadMgr = reinterpret_cast<ITfThreadMgr *>(env->GetLongField(thiz, env->GetFieldID(env->GetObjectClass(thiz), "pointer", "J")));
-    ITfDocumentMgr *docMgr = reinterpret_cast<ITfDocumentMgr *>(env->GetLongField(documentManager, env->GetFieldID(docManagerClazz, "pointer", "J")));
+    ITfDocumentMgr *docMgr = nullptr;
+    if (documentManager != nullptr)
+    {
+        docMgr = reinterpret_cast<ITfDocumentMgr *>(env->GetLongField(documentManager, env->GetFieldID(docManagerClazz, "pointer", "J")));
+    }
     ITfDocumentMgr *privDocMgr;
     HRESULT ret = threadMgr->AssociateFocus(reinterpret_cast<HWND>(winHandle), docMgr, &privDocMgr);
     if (FAILED(ret))
