@@ -1,19 +1,26 @@
 package tech.tnze.msctf;
 
-public class UIElementManager implements AutoCloseable {
-    private final long pointer;
+import windows.win32.ui.textservices.ITfUIElement;
+import windows.win32.ui.textservices.ITfUIElementMgr;
 
-    UIElementManager(long p) {
-        pointer = p;
+import java.lang.foreign.Arena;
+
+import static java.lang.foreign.ValueLayout.ADDRESS;
+import static tech.tnze.msctf.WindowsException.checkResult;
+
+public class UIElementManager {
+    private final ITfUIElementMgr inner;
+
+    UIElementManager(ITfUIElementMgr inner) {
+        this.inner = inner;
     }
 
-    public native UIElement getUIElement(int uiElementId);
-
-    @Override
-    public native void close() throws Exception;
-
-    @Override
-    public String toString() {
-        return "ITfUIElementMgr@" + Long.toHexString(pointer);
+    public UIElement getUIElement(int uiElementId) {
+        try (var arena = Arena.ofConfined()) {
+            var elementHolder = arena.allocate(ADDRESS.withTargetLayout(ITfUIElement.addressLayout()));
+            checkResult(inner.GetUIElement(uiElementId, elementHolder));
+            var element = elementHolder.get(ITfUIElement.addressLayout(), 0);
+            return new UIElement(ITfUIElement.wrap(element));
+        }
     }
 }

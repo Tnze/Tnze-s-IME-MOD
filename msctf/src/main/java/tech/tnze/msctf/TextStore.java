@@ -1,6 +1,6 @@
 package tech.tnze.msctf;
 
-public interface TextStore extends ContextOwnerCompositionSink {
+public interface TextStore {
     void adviseSink();
     void findNextAttrTransition();
     void getACPFromPoint();

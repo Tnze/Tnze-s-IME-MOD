@@ -16,8 +16,7 @@ import tech.tnze.msctf.*;
 
 import java.lang.foreign.Arena;
 
-import static tech.tnze.client.IMEClient.mThreadManager;
-import static tech.tnze.client.IMEClient.LOGGER;
+import static tech.tnze.client.IMEClient.*;
 
 @Mixin(Minecraft.class)
 public abstract class MinecraftMixin {
@@ -34,27 +33,30 @@ public abstract class MinecraftMixin {
 //        }
 
         // Create ITfThreadMgr instance
-        mThreadManager = new ThreadManager(Arena.ofAuto());
+        mThreadManager = new ThreadManager();
         LOGGER.debug("Create ITfThreadMgr success");
 
-        IMEClient.mClientId = mThreadManager.activateEx(ThreadManager.TF_TMAE_UIELEMENTENABLEDONLY);
-        LOGGER.debug("Activated TSF with ClientID={}", IMEClient.mClientId);
+        mClientId = mThreadManager.activateEx(ThreadManager.TF_TMAE_UIELEMENTENABLEDONLY);
+        LOGGER.debug("Activated TSF with ClientID={}", mClientId);
 
-        IMEClient.mUIElementManager = mThreadManager.getUIElementManager();
+        mUIElementManager = mThreadManager.getUIElementManager();
         LOGGER.debug("Obtained ITfUIElementMgr");
 
         try (Source source = mThreadManager.getSource()) {
-            source.adviseSink(Manager.getInstance());
+            source.adviseSink(Manager.getInstance().uiElementSink);
             LOGGER.info("Registered UIElementSink");
         }
 
         long winHandle = GLFWNativeWin32.glfwGetWin32Window(getWindow().handle());
         LOGGER.debug("Window handle: {}", winHandle);
 
-        IMEClient.mDocumentManager = mThreadManager.createDocumentManager();
-        LOGGER.debug("Created DocumentManager: {}", IMEClient.mDocumentManager);
+        mDocumentManager = mThreadManager.createDocumentManager();
+        LOGGER.debug("Created DocumentManager: {}", mDocumentManager);
 
-        try(DocumentManager oldDocMgr = mThreadManager.associateFocus(winHandle, IMEClient.mDocumentManager)) {
+        Context context = mDocumentManager.createContext(mClientId, 0, Manager.getInstance().contextOwnerCompositionSink);
+        mDocumentManager.push(context);
+
+        try(DocumentManager oldDocMgr = mThreadManager.associateFocus(winHandle, mDocumentManager)) {
             LOGGER.debug("Old DocumentManager: {}", oldDocMgr);
         } catch (Exception e) {
             throw new RuntimeException(e);

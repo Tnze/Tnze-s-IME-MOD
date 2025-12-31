@@ -1,10 +1,12 @@
 package tech.tnze.msctf;
 
-public class UIElement implements AutoCloseable {
-    private final long pointer;
+import windows.win32.ui.textservices.ITfUIElement;
 
-    UIElement(long p) {
-        pointer = p;
+public class UIElement implements AutoCloseable {
+    private final ITfUIElement inner;
+
+    UIElement(ITfUIElement inner) {
+        this.inner = inner;
     }
 
     public native String getDescription();
@@ -17,11 +19,9 @@ public class UIElement implements AutoCloseable {
 
     public native TransitoryExtensionUIElement intoTransitoryExtensionUIElement();
 
-    @Override
-    public native void close() throws Exception;
 
     @Override
-    public String toString() {
-        return "ITfUIElement@" + Long.toHexString(pointer);
+    public void close() throws Exception {
+        inner.Release();
     }
 }

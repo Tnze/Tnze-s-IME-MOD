@@ -7,21 +7,22 @@ import windows.win32.ui.textservices.*;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
-import java.util.function.Consumer;
 
+import static java.lang.foreign.ValueLayout.ADDRESS;
+import static tech.tnze.msctf.WindowsException.checkResult;
 import static windows.win32.ui.textservices.Constants.CLSID_TF_ThreadMgr;
 
 public class ThreadManager implements AutoCloseable {
     private final Arena arena;
-    private final ITfThreadMgrEx inner;
+    private ITfThreadMgrEx inner;
 
     public static final int TF_TMAE_UIELEMENTENABLEDONLY = Constants.TF_TMAE_UIELEMENTENABLEDONLY;
 
-    public ThreadManager(Arena a) throws WindowsException {
-        this.arena = a;
+    public ThreadManager() throws WindowsException {
+        this.arena = Arena.ofAuto();
         try (var arena = Arena.ofConfined()) {
-            var threadMgrHolder = arena.allocate(ValueLayout.ADDRESS.withTargetLayout(ITfThreadMgrEx.addressLayout()));
-            WindowsException.checkResult(Apis.CoCreateInstance(
+            var threadMgrHolder = arena.allocate(ADDRESS.withTargetLayout(ITfThreadMgrEx.addressLayout()));
+            checkResult(Apis.CoCreateInstance(
                     CLSID_TF_ThreadMgr(),
                     MemorySegment.NULL,
                     CLSCTX.INPROC_SERVER,
@@ -37,7 +38,7 @@ public class ThreadManager implements AutoCloseable {
     public int activateEx(int flags) throws WindowsException {
         try (var arena = Arena.ofConfined()) {
             var clientIdHolder = arena.allocate(ValueLayout.JAVA_INT);
-            WindowsException.checkResult(this.inner.ActivateEx(clientIdHolder, flags));
+            checkResult(this.inner.ActivateEx(clientIdHolder, flags));
             return clientIdHolder.get(ValueLayout.JAVA_INT, 0);
         }
     }
@@ -45,37 +46,50 @@ public class ThreadManager implements AutoCloseable {
     public DocumentManager associateFocus(long hwnd, DocumentManager documentManager) throws WindowsException {
         try (var arena = Arena.ofConfined()) {
             var handle = arena.allocate(ValueLayout.JAVA_LONG, hwnd);
-            var docMgrHolder = arena.allocate(ITfDocumentMgr.addressLayout());
-            // 无法从 ITfDocumentMgr 转换为 MemorySegment，才采取该办法
-            WindowsException.checkResult(documentManager.inner.QueryInterface(ITfDocumentMgr.iid(), docMgrHolder));
-            var prevHolder = this.arena.allocate(ITfDocumentMgr.addressLayout());
-            WindowsException.checkResult(inner.AssociateFocus(handle, docMgrHolder, prevHolder));
-            return new DocumentManager(ITfDocumentMgr.wrap(prevHolder));
+            // 将 ITfDocumentMgr 转换为 MemorySegment
+            var docMgrHolder = arena.allocate(ADDRESS.withTargetLayout(ITfDocumentMgr.addressLayout()));
+            checkResult(documentManager.inner.QueryInterface(ITfDocumentMgr.iid(), docMgrHolder));
+            var docMgr = docMgrHolder.get(ITfDocumentMgr.addressLayout(), 0);
+
+            var prevHolder = this.arena.allocate(ADDRESS.withTargetLayout(ITfDocumentMgr.addressLayout()));
+            checkResult(inner.AssociateFocus(handle, docMgr, prevHolder));
+            return new DocumentManager(ITfDocumentMgr.wrap(prevHolder.get(ITfDocumentMgr.addressLayout(), 0)));
         }
     }
 
     public void deactivate() {
-        int ret = inner.Deactivate();
+        checkResult(inner.Deactivate());
     }
 
     public Source getSource() {
-        var sourceHolder = arena.allocate(ITfSource.addressLayout());
-        int ret = inner.QueryInterface(ITfSource.iid(), sourceHolder);
-        return new Source(ITfSource.wrap(sourceHolder));
+        try (var arena = Arena.ofConfined()) {
+            var sourceHolder = arena.allocate(ADDRESS.withTargetLayout(ITfSource.addressLayout()));
+            checkResult(inner.QueryInterface(ITfSource.iid(), sourceHolder));
+            return new Source(ITfSource.wrap(sourceHolder.get(ITfSource.addressLayout(), 0)));
+        }
     }
 
     public DocumentManager createDocumentManager() {
-        var documentMgrHolder = arena.allocate(ITfDocumentMgr.addressLayout());
-//        inner.CreateDocumentMgr()
-        return null;
+        try (var arena = Arena.ofConfined()) {
+            var documentMgrHolder = arena.allocate(ITfDocumentMgr.addressLayout());
+            checkResult(inner.CreateDocumentMgr(documentMgrHolder));
+            var documentMgr = documentMgrHolder.get(ITfDocumentMgr.addressLayout(), 0);
+            return new DocumentManager(ITfDocumentMgr.wrap(documentMgr));
+        }
     }
 
-    public native UIElementManager getUIElementManager();
-
-    public native void enumDocumentManagers(Consumer<DocumentManager> consumer);
+    public UIElementManager getUIElementManager() {
+        try (var arena = Arena.ofConfined()) {
+            var uiElementMgrHolder = arena.allocate(ITfUIElementMgr.addressLayout());
+            checkResult(inner.QueryInterface(ITfUIElementMgr.iid(), uiElementMgrHolder));
+            var uiElementMgr = uiElementMgrHolder.get(ITfUIElementMgr.addressLayout(), 0);
+            return new UIElementManager(ITfUIElementMgr.wrap(uiElementMgr));
+        }
+    }
 
     @Override
     public void close() {
         inner.Release();
+        inner = null; // Avoid double free
     }
 }

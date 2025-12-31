@@ -22,10 +22,13 @@ tasks.generateWindowsApi {
         "ITfUIElementMgr",
         "ITfUIElementSink",
         "ITextStoreACP",
+        "ITfContextOwnerCompositionSink",
     )
     constants = listOf(
         "CLSID_TF_ThreadMgr",
         "TF_TMAE_UIELEMENTENABLEDONLY",
+        "E_INVALIDARG",
+        "E_NOINTERFACE",
     )
 }
 

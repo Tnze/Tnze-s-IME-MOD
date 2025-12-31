@@ -20,15 +20,7 @@ import static tech.tnze.client.IMEClient.LOGGER;
 public class EditBoxMixin {
     @Inject(method = "<init>(Lnet/minecraft/client/gui/Font;IIIILnet/minecraft/client/gui/components/EditBox;Lnet/minecraft/network/chat/Component;)V", at = @At("TAIL"))
     public void tnze$registerDocumentMgr(Font font, int x, int y, int w, int h, EditBox editBox, Component message, CallbackInfo ci) {
-        Manager manager = Manager.getInstance();
 
-        try {
-            Context ctx = mDocumentManager.createContext(mClientId, 0, manager);
-            IMEClient.mContexts.put((EditBox) (Object) this, ctx);
-            mDocumentManager.push(ctx);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 
     @Inject(method = "setFocused(Z)V", at = @At("TAIL"))

@@ -1,19 +1,24 @@
 package tech.tnze.msctf;
 
-public class Range implements AutoCloseable {
-    private final long pointer;
+import windows.win32.ui.textservices.ITfRange;
 
-    Range(long p) {
-        pointer = p;
+import static tech.tnze.msctf.WindowsException.checkResult;
+
+public class Range implements AutoCloseable {
+    private ITfRange inner;
+
+    Range(ITfRange inner) {
+        this.inner = inner;
     }
 
-    public native String getText(int editCookie);
+    public String getText(int editCookie) {
+//        checkResult(inner.GetText(editCookie, 0, ))
+        return ""; // TODO
+    }
 
     @Override
-    public native void close() throws Exception;
-
-    @Override
-    public String toString() {
-        return "ITfRange@" + Long.toHexString(pointer);
+    public void close() throws Exception {
+        inner.Release();
+        inner = null; // Avoid double free
     }
 }

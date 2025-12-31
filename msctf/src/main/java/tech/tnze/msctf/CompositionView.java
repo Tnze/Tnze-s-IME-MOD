@@ -1,21 +1,40 @@
 package tech.tnze.msctf;
 
-public class CompositionView implements AutoCloseable {
-    private final long pointer;
+import system.Guid;
+import windows.win32.ui.textservices.ITfCompositionView;
+import windows.win32.ui.textservices.ITfRange;
 
-    CompositionView(long p) {
-        pointer = p;
+import java.lang.foreign.Arena;
+
+import static java.lang.foreign.ValueLayout.ADDRESS;
+import static tech.tnze.msctf.WindowsException.checkResult;
+
+public class CompositionView implements AutoCloseable {
+    private final ITfCompositionView inner;
+
+    CompositionView(ITfCompositionView inner) {
+        this.inner = inner;
     }
 
-    public native String getOwnerClsid();
+    public String getOwnerClsid() {
+        try (var arena = Arena.ofConfined()) {
+            var clsid = arena.allocate(Guid.layout());
+            checkResult(inner.GetOwnerClsid(clsid));
+            return ""; // TODO
+        }
+    }
 
-    public native Range getRange();
+    public Range getRange() {
+        try (var arena = Arena.ofConfined()) {
+            var rangeHolder = arena.allocate(ADDRESS.withTargetLayout(ITfRange.addressLayout()));
+            checkResult(inner.GetRange(rangeHolder));
+            var range = ITfRange.wrap(rangeHolder.get(ITfRange.addressLayout(), 0));
+            return new Range(range);
+        }
+    }
 
     @Override
-    public native void close() throws Exception;
-
-    @Override
-    public String toString() {
-        return "ITfCompositionView@" + Long.toHexString(pointer);
+    public void close() throws Exception {
+        inner.Release();
     }
 }

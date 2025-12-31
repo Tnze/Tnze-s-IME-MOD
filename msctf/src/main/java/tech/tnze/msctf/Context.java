@@ -1,33 +1,36 @@
 package tech.tnze.msctf;
 
-public class Context implements AutoCloseable {
-    private long pointer;
-    private int editCookie;
+import windows.win32.ui.textservices.ITfContext;
+import windows.win32.ui.textservices.ITfSource;
 
-    Context(long p, int ec) {
-        pointer = p;
-        editCookie = ec;
+import java.lang.foreign.Arena;
+
+import static java.lang.foreign.ValueLayout.ADDRESS;
+import static tech.tnze.msctf.WindowsException.checkResult;
+
+public class Context implements AutoCloseable {
+    private final ITfContext inner;
+    private final int editCookie;
+
+    Context(ITfContext inner, int editCookie) {
+        this.inner = inner;
+        this.editCookie = editCookie;
     }
 
     public int getEditCookie() {
         return editCookie;
     }
 
-    public native Source getSource();
-
-    @Override
-    public native void close() throws Exception;
-
-    @Override
-    public String toString() {
-        return "ITfContext@" + Long.toHexString(pointer);
+    public Source getSource() {
+        try (var arena = Arena.ofConfined()) {
+            var sourceHolder = arena.allocate(ADDRESS.withTargetLayout(ITfSource.addressLayout()));
+            checkResult(inner.QueryInterface(ITfSource.iid(), sourceHolder));
+            return new Source(ITfSource.wrap(sourceHolder.get(ITfSource.addressLayout(), 0)));
+        }
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (obj instanceof Context) {
-            return this.pointer == ((Context) obj).pointer;
-        }
-        return false;
+    public void close() throws Exception {
+        inner.Release();
     }
 }
