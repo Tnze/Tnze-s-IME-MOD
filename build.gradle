@@ -53,15 +53,9 @@ processResources {
                 "minecraft_version": project.minecraft_version,
                 "loader_version": project.loader_version
     }
-
-    dependsOn(":natives:assembleRelease")
-    from(project(":natives").layout.buildDirectory.dir("lib/main/release")) {
-        include("*.dll")
-        into("natives")
-    }
 }
 
-def targetJavaVersion = 21
+def targetJavaVersion = 23
 tasks.withType(JavaCompile).configureEach {
     // ensure that the encoding is set to UTF-8, no matter what the system default is
     // this fixes some edge cases with special characters not displaying correctly

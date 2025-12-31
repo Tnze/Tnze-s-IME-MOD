@@ -2,10 +2,11 @@
   "required": true,
   "minVersion": "0.8",
   "package": "tech.tnze.mixin.client",
-  "compatibilityLevel": "JAVA_21",
+  "compatibilityLevel": "JAVA_23",
   "client": [
-    "MinecraftMixin",
     "EditBoxMixin",
+    "InputConstantsMixin",
+    "MinecraftMixin",
     "ScreenMixin"
   ],
   "injectors": {

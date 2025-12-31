@@ -1,11 +1,35 @@
 plugins {
     id("java")
+    id("net.codecrete.windows-api") version "0.8.2"
 }
 
 group = rootProject.group
 version = rootProject.version
 
-val targetJavaVersion = 21
+tasks.generateWindowsApi {
+    functions = listOf(
+        "CoInitializeEx",
+        "CoUninitialize",
+        "CoCreateInstance",
+        "FormatMessageW",
+        "LocalFree"
+    )
+    comInterfaces = listOf(
+        "ITfSource",
+        "ITfThreadMgr",
+        "ITfThreadMgrEx",
+        "ITfDocumentMgr",
+        "ITfUIElementMgr",
+        "ITfUIElementSink",
+        "ITextStoreACP",
+    )
+    constants = listOf(
+        "CLSID_TF_ThreadMgr",
+        "TF_TMAE_UIELEMENTENABLEDONLY",
+    )
+}
+
+val targetJavaVersion = 23
 
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"

@@ -1,10 +1,12 @@
 package tech.tnze.msctf;
 
-public class Source implements AutoCloseable {
-    private final long pointer;
+import windows.win32.ui.textservices.ITfSource;
 
-    Source(long p) {
-        pointer = p;
+public class Source implements AutoCloseable {
+    private final ITfSource inner;
+
+    Source(ITfSource inner) {
+        this.inner = inner;
     }
 
     private static native void releaseInstance(long p);
@@ -24,11 +26,6 @@ public class Source implements AutoCloseable {
 
     @Override
     public void close() {
-        releaseInstance(pointer);
-    }
-
-    @Override
-    public String toString() {
-        return "ITfSource@" + Long.toHexString(pointer);
+        inner.Release();
     }
 }

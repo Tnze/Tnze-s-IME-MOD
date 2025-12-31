@@ -13,7 +13,6 @@ import java.util.*;
 
 public class Manager implements UIElementSink, ContextOwnerCompositionSink { // TODO: Implement ItfContextOwner and ITfTransitoryExtensionSink
     public static final TreeMap<Integer, Renderable> uiElements = new TreeMap<>();
-    public static final HashMap<EditBox, DocumentManager> documentManagers = new HashMap<>();
     public static final Cleaner mDocumentCleaner = Cleaner.create();
 
     private int editCookie = 0;

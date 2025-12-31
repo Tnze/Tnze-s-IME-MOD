@@ -22,4 +22,12 @@ public class Context implements AutoCloseable {
     public String toString() {
         return "ITfContext@" + Long.toHexString(pointer);
     }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj instanceof Context) {
+            return this.pointer == ((Context) obj).pointer;
+        }
+        return false;
+    }
 }
