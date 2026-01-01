@@ -35,7 +35,7 @@ public class ComObject implements IUnknown {
 
     private MemorySegment thisPointer;
 
-    private int refCount = 0;
+    private int refCount = 1;
 
     /**
      * Creates a new instance.

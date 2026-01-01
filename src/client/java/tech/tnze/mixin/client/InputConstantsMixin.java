@@ -11,6 +11,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 public class InputConstantsMixin {
     @Redirect(method = "setupKeyboardCallbacks", at= @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwSetCharModsCallback(JLorg/lwjgl/glfw/GLFWCharModsCallbackI;)Lorg/lwjgl/glfw/GLFWCharModsCallback;"))
     private static GLFWCharModsCallback tnze$setupCharModesCallback(long window, GLFWCharModsCallbackI cbfun) {
+        // Not register the callback
         return null;
     }
 }

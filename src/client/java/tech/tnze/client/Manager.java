@@ -1,22 +1,24 @@
 package tech.tnze.client;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Renderable;
 import tech.tnze.msctf.*;
-import windows.win32.ui.textservices.ITfContextOwnerCompositionSink;
-import windows.win32.ui.textservices.ITfUIElementSink;
+import windows.win32.system.com.Apis;
+import windows.win32.system.com.CLSCTX;
+import windows.win32.system.com.IUnknown;
+import windows.win32.ui.textservices.*;
 
+import static java.lang.foreign.ValueLayout.*;
 import static tech.tnze.client.IMEClient.LOGGER;
-import static tech.tnze.client.IMEClient.mUIElementManager;
+import static tech.tnze.msctf.WindowsException.checkResult;
+import static windows.win32.ui.textservices.Constants.CLSID_TF_ThreadMgr;
+import static windows.win32.ui.textservices.Constants.TF_TMAE_UIELEMENTENABLEDONLY;
 
-import java.lang.ref.Cleaner;
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
 import java.util.*;
 
-public class Manager { // TODO: Implement ItfContextOwner and ITfTransitoryExtensionSink
+public class Manager {
     public static final TreeMap<Integer, Renderable> uiElements = new TreeMap<>();
-    public static final Cleaner mDocumentCleaner = Cleaner.create();
-
-    private int editCookie = 0;
 
     private static Manager instance = null;
 
@@ -30,150 +32,142 @@ public class Manager { // TODO: Implement ItfContextOwner and ITfTransitoryExten
     private Manager() {
     }
 
-    public UIElementSink uiElementSink = new UIElementSink() {
-        @Override
-        public boolean beginUIElement(int uiElementId) {
-            LOGGER.debug("BeginUIElement: ID={}", uiElementId);
-            try (UIElement element = mUIElementManager.getUIElement(uiElementId)) {
+    private long hwnd;
+    private ITfThreadMgrEx threadManager;
+    private int clientId;
+    private ITfUIElementMgr uiElementMgr;
+    private ITfDocumentMgr documentMgr;
+    private MemorySegment documentMgrPtr;
+    private ITfContext context;
+    private MemorySegment contextPtr;
 
-                CandidateListUIElement candidateList = element.intoCandidateListUIElement();
-                if (candidateList != null) {
-                    try (candidateList) {
-                        synchronized (uiElements) {
-                            Renderable pre = uiElements.put(uiElementId, new CandidateList(Minecraft.getInstance()));
-                            if (pre != null) {
-                                LOGGER.warn("Duplicate UIElement registered, what happened?");
-                            }
-                        }
-                    }
-                    return false;
-                }
-
-                ToolTipUIElement toolTip = element.intoToolTipUIElement();
-                if (toolTip != null) {
-                    try (toolTip) {
-                        synchronized (uiElements) {
-                            LOGGER.info("Add ToolTip {}", uiElementId);
-                            // TODO: Create UI
-                        }
-                    }
-                    return false;
-                }
-
-                TransitoryExtensionUIElement transitoryExtension = element.intoTransitoryExtensionUIElement();
-                if (transitoryExtension != null) {
-                    try (transitoryExtension) {
-                        synchronized (uiElements) {
-                            LOGGER.info("Add TransitoryExtension {}", uiElementId);
-                            // TODO: Create UI
-                        }
-                    }
-                    return false;
-                }
-
-                LOGGER.warn("Unknown UIElement: DESC={}, GUID={}", element.getDescription(), element.getGUID());
-            } catch (Exception e) {
-                LOGGER.error("Failed to get UIElement {} on BeginUIElement", uiElementId);
-            }
-            return true;
+    public void init(long hwnd) {
+        this.hwnd = hwnd;
+        // Create ITfThreadMgr
+        try (var arena = Arena.ofConfined()) {
+            var threadMgrHolder = arena.allocate(ADDRESS.withTargetLayout(ITfThreadMgrEx.addressLayout()));
+            checkResult(Apis.CoCreateInstance(CLSID_TF_ThreadMgr(), MemorySegment.NULL, CLSCTX.INPROC_SERVER, ITfThreadMgrEx.iid(), threadMgrHolder));
+            threadManager = ITfThreadMgrEx.wrap(threadMgrHolder.get(ITfThreadMgr.addressLayout(), 0));
         }
 
-        @Override
-        public void updateUIElement(int uiElementId) {
-            LOGGER.debug("UIElement UPDATE: ID={}", uiElementId);
-            try (UIElement element = mUIElementManager.getUIElement(uiElementId)) {
-
-                CandidateListUIElement candidateList = element.intoCandidateListUIElement();
-                if (candidateList != null) {
-                    try (candidateList) {
-                        int totalCount = candidateList.getCount();
-                        int currentPage = candidateList.getCurrentPage();
-                        int currentSelection = candidateList.getSelection();
-                        int[] indexes = new int[candidateList.getPageIndex(null)];
-                        int pageCount = candidateList.getPageIndex(indexes);
-                        LOGGER.debug("Candidate count={} [{}]{}", totalCount, pageCount, indexes);
-
-                        int currPageStart = indexes[currentPage];
-                        int currPageEnd = (currentPage + 1) < pageCount ? indexes[currentPage + 1] : totalCount;
-                        int currPageSize = currPageEnd - currPageStart;
-                        String[] currentPageContent = new String[currPageSize];
-                        for (int i = 0; i < currPageSize; i++) {
-                            currentPageContent[i] = candidateList.getString(currPageStart + i);
-                        }
-
-                        synchronized (uiElements) {
-                            Renderable list = uiElements.get(uiElementId);
-                            if (list == null) {
-                                LOGGER.warn("Updating an unexist CandidateList");
-                                return;
-                            }
-                            if (list instanceof CandidateList) {
-                                ((CandidateList) list).setState(totalCount, pageCount, currentPage, currentPageContent, currentSelection - currPageStart);
-                            } else {
-                                LOGGER.warn("Not updating a CandidateList, element id underlying type changed?");
-                            }
-                        }
-                    }
-                    return;
-                }
-
-                ToolTipUIElement toolTip = element.intoToolTipUIElement();
-                if (toolTip != null) {
-                    try (toolTip) {
-                        LOGGER.info("ToolTip: {}", toolTip.getString());
-                    }
-                    return;
-                }
-
-
-                TransitoryExtensionUIElement transitoryExtension = element.intoTransitoryExtensionUIElement();
-                if (transitoryExtension != null) {
-                    try (transitoryExtension) {
-                        LOGGER.info("TransitoryExtension {}", uiElementId);
-                    }
-                    return;
-                }
-
-                LOGGER.warn("Unknown UIElement DESC={}, GUID={}", element.getDescription(), element.getGUID());
-            } catch (Exception e) {
-                LOGGER.error("Failed to get UIElement {} on UpdateUIElement: {}", uiElementId, e);
-            }
+        // Activate Text Service
+        try (var arena = Arena.ofConfined()) {
+            var clientIdHolder = arena.allocate(JAVA_INT);
+            checkResult(threadManager.ActivateEx(clientIdHolder, TF_TMAE_UIELEMENTENABLEDONLY));
+            clientId = clientIdHolder.get(JAVA_INT, 0);
         }
 
-        @Override
-        public void endUIElement(int uiElementId) {
-            LOGGER.debug("EndUIElement: ID={}", uiElementId);
-            synchronized (uiElements) {
-                uiElements.remove(uiElementId);
-            }
+        // Query ITfUIElementMgr
+        try (var arena = Arena.ofConfined()) {
+            var uiElementMgrHolder = arena.allocate(ADDRESS.withTargetLayout(ITfUIElementMgr.addressLayout()));
+            checkResult(threadManager.QueryInterface(ITfUIElementMgr.iid(), uiElementMgrHolder));
+            uiElementMgr = ITfUIElementMgr.wrap(uiElementMgrHolder.get(ITfUIElementMgr.addressLayout(), 0));
         }
-    };
 
-    public void setEditCookie(int cookie) {
-        editCookie = cookie;
+        // Register ITfUIElementSink
+        try (var arena = Arena.ofConfined()) {
+            var sourceHolder = arena.allocate(ADDRESS.withTargetLayout(ITfSource.addressLayout()));
+            checkResult(uiElementMgr.QueryInterface(ITfSource.iid(), sourceHolder));
+            var source = ITfSource.wrap(sourceHolder.get(ITfSource.addressLayout(), 0));
+
+            var sink = new UIElementSink();
+            var sinkUpcallWrapper = ITfUIElementSink.create(sink, Arena.global()); // TODO: Do we need global?
+            sink.setThisPointer(sinkUpcallWrapper);
+
+            var cookieHolder = arena.allocate(JAVA_INT);
+            checkResult(source.AdviseSink(ITfUIElementSink.iid(), sinkUpcallWrapper, cookieHolder));
+            source.Release();
+
+            LOGGER.info("UIElementSink cookie={}", cookieHolder.get(JAVA_INT, 0));
+        }
+
+        // Create ITfDocumentMgr
+        try (var arena = Arena.ofConfined()) {
+            var documentMgrHolder = arena.allocate(ADDRESS.withTargetLayout(ITfDocumentMgr.addressLayout()));
+            checkResult(threadManager.CreateDocumentMgr(documentMgrHolder));
+            documentMgrPtr = documentMgrHolder.get(ITfDocumentMgr.addressLayout(), 0);
+            documentMgr = ITfDocumentMgr.wrap(documentMgrPtr);
+        }
+
+        // Create Context
+        try (var arena = Arena.ofConfined()) {
+            var sink = new TextStore();
+            var sinkUpcallWrapper = ITfContextOwnerCompositionSink.create(sink, Arena.global());
+            sink.setThisPointer(sinkUpcallWrapper);
+
+            var contextHolder = arena.allocate(ADDRESS.withTargetLayout(ITfContext.addressLayout()));
+            var editCookieHolder = arena.allocate(JAVA_INT);
+            checkResult(documentMgr.CreateContext(clientId, 0, sinkUpcallWrapper, contextHolder, editCookieHolder));
+
+            contextPtr = contextHolder.get(ITfContext.addressLayout(), 0);
+            context = ITfContext.wrap(contextPtr);
+            var editCookie = editCookieHolder.get(JAVA_INT, 0);
+            LOGGER.info("Edit cookie={}", editCookie);
+
+            // Push Context
+            checkResult(documentMgr.Push(contextPtr));
+        }
     }
 
-    public ContextOwnerCompositionSink contextOwnerCompositionSink = new ContextOwnerCompositionSink() {
-        @Override
-        public boolean onStartComposition(CompositionView composition) {
-            LOGGER.info("Start composition");
-            return true;
+    public void setFocus(boolean isFocused) {
+        try (var arena = Arena.ofConfined()) {
+            var prevDocumentMgrHolder = arena.allocate(ADDRESS.withTargetLayout(ITfDocumentMgr.addressLayout()));
+            threadManager.AssociateFocus(MemorySegment.ofAddress(hwnd), isFocused ? documentMgrPtr : MemorySegment.NULL, prevDocumentMgrHolder);
+            var prevDocumentMgr = prevDocumentMgrHolder.get(ITfDocumentMgr.addressLayout(), 0);
+            LOGGER.info("Set focused: previous ITfDocumentMgr={}", prevDocumentMgr);
+        }
+    }
+
+    private class UIElementSink extends ComObject implements ITfUIElementSink {
+        private final static MemorySegment[] implementedIIDs = {IUnknown.iid(), ITfUIElementSink.iid()};
+
+        public UIElementSink() {
+            super(implementedIIDs);
         }
 
         @Override
-        public void onUpdateComposition(CompositionView composition, Range range) {
-            LOGGER.info("Update composition: {}", range != null ? range.getText(editCookie) : null);
+        public int BeginUIElement(int dwUIElementId, MemorySegment pbShow) {
+            LOGGER.info("BeginUIElement");
+            return 0;
         }
 
         @Override
-        public void onEndComposition(CompositionView composition) {
-            LOGGER.info("End composition: {}", composition.getOwnerClsid());
-            try (Range range = composition.getRange()) {
-                LOGGER.info("End composition: {}", range);
-//            LOGGER.info("End composition: {}", range.getText(editCookie));
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
+        public int UpdateUIElement(int dwUIElementId) {
+            LOGGER.info("UpdateUIElement");
+            return 0;
         }
-    };
+
+        @Override
+        public int EndUIElement(int dwUIElementId) {
+            LOGGER.info("EndUIElement");
+            return 0;
+        }
+    }
+
+    private class TextStore extends ComObject implements ITfContextOwnerCompositionSink {
+        private final static MemorySegment[] implementedIIDs = {IUnknown.iid(), ITfUIElementSink.iid()};
+
+        public TextStore() {
+            super(implementedIIDs);
+        }
+
+        @Override
+        public int OnStartComposition(MemorySegment pComposition, MemorySegment pfOk) {
+            LOGGER.debug("OnStartComposition");
+            pfOk.set(JAVA_BOOLEAN, 0, true);
+            return 0;
+        }
+
+        @Override
+        public int OnUpdateComposition(MemorySegment pComposition, MemorySegment pRangeNew) {
+            LOGGER.debug("OnUpdateComposition");
+            return 0;
+        }
+
+        @Override
+        public int OnEndComposition(MemorySegment pComposition) {
+            LOGGER.debug("OnEndComposition");
+            return 0;
+        }
+    }
 }

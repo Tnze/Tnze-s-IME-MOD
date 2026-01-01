@@ -18,12 +18,6 @@ public class IMEClient implements ClientModInitializer {
 
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
-    public static ThreadManager mThreadManager = null;
-    public static DocumentManager mDocumentManager = null;
-    public static UIElementManager mUIElementManager = null;
-    public static HashMap<EditBox, Context> mContexts = new HashMap<>();
-    public static int mClientId = 0;
-
     @Override
     public void onInitializeClient() {
         LOGGER.info("Tnze's IME mod is initializing");

@@ -23,6 +23,8 @@ tasks.generateWindowsApi {
         "ITfUIElementSink",
         "ITextStoreACP",
         "ITfContextOwnerCompositionSink",
+        "ITfCandidateListUIElement",
+        "ITextStoreACP2",
     )
     constants = listOf(
         "CLSID_TF_ThreadMgr",
