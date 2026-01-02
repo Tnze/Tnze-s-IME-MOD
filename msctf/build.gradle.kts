@@ -12,7 +12,9 @@ tasks.generateWindowsApi {
         "CoUninitialize",
         "CoCreateInstance",
         "FormatMessageW",
-        "LocalFree"
+        "LocalFree",
+        "SysStringLen",
+        "SysFreeString"
     )
     comInterfaces = listOf(
         "ITfSource",
@@ -21,16 +23,41 @@ tasks.generateWindowsApi {
         "ITfDocumentMgr",
         "ITfUIElementMgr",
         "ITfUIElementSink",
-        "ITextStoreACP",
         "ITfContextOwnerCompositionSink",
         "ITfCandidateListUIElement",
         "ITextStoreACP2",
+        "ITextStoreACPSink",
     )
     constants = listOf(
         "CLSID_TF_ThreadMgr",
         "TF_TMAE_UIELEMENTENABLEDONLY",
         "E_INVALIDARG",
         "E_NOINTERFACE",
+        "E_POINTER",
+        "CONNECT_E_CANNOTCONNECT",
+        "CONNECT_E_NOCONNECTION",
+        "CONNECT_E_ADVISELIMIT",
+        "TS_E_SYNCHRONOUS",
+        "TS_E_NOLOCK",
+        "TF_E_INVALIDPOS",
+        "TS_E_NOLAYOUT",
+        "TS_S_ASYNC",
+        "TS_LF_SYNC",
+        "TS_SD_LOADING",
+        "TS_SD_READONLY",
+        "TS_SS_DISJOINTSEL",
+        "TS_SS_REGIONS",
+        "TS_SS_TRANSITORY",
+        "TS_SS_NOHIDDENTEXT",
+        "TS_SS_TKBAUTOCORRECTENABLE",
+        "TS_SS_TKBPREDICTIONENABLE",
+        "TF_DEFAULT_SELECTION",
+        "TF_TF_IGNOREEND",
+    )
+    enumerations = listOf(
+        "TEXT_STORE_LOCK_FLAGS",
+        "TsActiveSelEnd",
+        "TsRunType",
     )
 }
 

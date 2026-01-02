@@ -13,7 +13,7 @@ import java.lang.foreign.MemorySegment;
 
 import static java.lang.foreign.ValueLayout.ADDRESS;
 import static java.lang.foreign.ValueLayout.JAVA_LONG;
-import static windows.win32.foundation.Constants.E_INVALIDARG;
+import static windows.win32.foundation.Constants.E_POINTER;
 import static windows.win32.foundation.Constants.E_NOINTERFACE;
 
 /**
@@ -74,8 +74,7 @@ public class ComObject implements IUnknown {
 
     @Override
     public int QueryInterface(MemorySegment riid, MemorySegment ppvObject) {
-        if (ppvObject.address() == 0L)
-            return E_INVALIDARG;
+        if (ppvObject.address() == 0L) return E_POINTER;
 
         for (var iid : implementedIIDs) {
             if (equalIIDs(iid, riid)) {
@@ -101,8 +100,7 @@ public class ComObject implements IUnknown {
         return refCount;
     }
 
-    private static boolean equalIIDs(MemorySegment iid1, MemorySegment iid2) {
-        return iid1.get(JAVA_LONG, 0L) == iid2.get(JAVA_LONG, 0L)
-                && iid1.get(JAVA_LONG, 8L) == iid2.get(JAVA_LONG, 8L);
+    protected static boolean equalIIDs(MemorySegment iid1, MemorySegment iid2) {
+        return iid1.get(JAVA_LONG, 0L) == iid2.get(JAVA_LONG, 0L) && iid1.get(JAVA_LONG, 8L) == iid2.get(JAVA_LONG, 8L);
     }
 }
