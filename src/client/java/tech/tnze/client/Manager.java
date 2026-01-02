@@ -1,7 +1,12 @@
 package tech.tnze.client;
 
+import net.minecraft.CrashReport;
+import net.minecraft.CrashReportCategory;
+import net.minecraft.ReportedException;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Renderable;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
 import tech.tnze.msctf.*;
 import windows.win32.foundation.RECT;
 import windows.win32.system.com.Apis;
@@ -127,7 +132,9 @@ public class Manager {
             threadManager.AssociateFocus(MemorySegment.ofAddress(hwnd), isFocused ? documentMgrPtr : MemorySegment.NULL, prevDocumentMgrHolder);
             var prevDocumentMgr = prevDocumentMgrHolder.get(ITfDocumentMgr.addressLayout(), 0);
             LOGGER.info("Set focused {}: previous ITfDocumentMgr={}", isFocused, prevDocumentMgr);
-            ITfDocumentMgr.wrap(prevDocumentMgr).Release();
+            if (prevDocumentMgr.address() != 0) {
+                ITfDocumentMgr.wrap(prevDocumentMgr).Release();
+            }
         }
     }
 
@@ -320,6 +327,26 @@ public class Manager {
                 var compositionResult = String.valueOf(chars);
 
                 LOGGER.info("Composition result: {}", compositionResult);
+
+                var minecraft = Minecraft.getInstance();
+                minecraft.execute(() -> {
+                    Screen screen = minecraft.screen;
+                    if (screen != null && minecraft.getOverlay() == null) {
+                        compositionResult.codePoints().forEach(ch -> {
+                            CharacterEvent characterEvent = new CharacterEvent(ch, 0);
+                            try {
+                                screen.charTyped(characterEvent);
+                            } catch (Throwable var8) {
+                                CrashReport crashReport = CrashReport.forThrowable(var8, "charTyped event handler");
+                                screen.fillCrashDetails(crashReport);
+                                CrashReportCategory crashReportCategory = crashReport.addCategory("Key");
+                                crashReportCategory.setDetail("Codepoint", characterEvent.codepoint());
+                                crashReportCategory.setDetail("Mods", characterEvent.modifiers());
+                                throw new ReportedException(crashReport);
+                            }
+                        });
+                    }
+                });
 
                 range.Release();
             }
