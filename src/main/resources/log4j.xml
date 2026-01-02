@@ -2,8 +2,8 @@
 <Configuration status="DEBUG" packages="tech.tnze">
     <Loggers>
         <Logger name="tnze-s-ime-mod" level="debug">
-            <AppenderRef ref="SysOut"/>
-            <AppenderRef ref="ServerGuiConsole"/>
+<!--            <AppenderRef ref="SysOut"/>-->
+<!--            <AppenderRef ref="ServerGuiConsole"/>-->
         </Logger>
     </Loggers>
 </Configuration>

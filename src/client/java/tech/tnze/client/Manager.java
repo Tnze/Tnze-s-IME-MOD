@@ -3,6 +3,7 @@ package tech.tnze.client;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Renderable;
 import tech.tnze.msctf.*;
+import windows.win32.foundation.RECT;
 import windows.win32.system.com.Apis;
 import windows.win32.system.com.CLSCTX;
 import windows.win32.system.com.IUnknown;
@@ -19,7 +20,6 @@ import static windows.win32.system.ole.Constants.*;
 import static windows.win32.ui.textservices.Constants.*;
 
 import java.lang.foreign.Arena;
-import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
 import java.util.*;
 
@@ -61,6 +61,7 @@ public class Manager {
             var clientIdHolder = arena.allocate(JAVA_INT);
             checkResult(threadManager.ActivateEx(clientIdHolder, TF_TMAE_UIELEMENTENABLEDONLY));
             clientId = clientIdHolder.get(JAVA_INT, 0);
+            LOGGER.info("ITfThreadManager client id: {}", clientId);
         }
 
         // Query ITfUIElementMgr
@@ -114,6 +115,9 @@ public class Manager {
 
             // Push Context
             checkResult(documentMgr.Push(contextPtr));
+
+            var rangeHolder = arena.allocate(ADDRESS.withTargetLayout(ITfRange.addressLayout()));
+            checkResult(context.GetStart(editCookie, rangeHolder));
         }
     }
 
@@ -122,7 +126,8 @@ public class Manager {
             var prevDocumentMgrHolder = arena.allocate(ADDRESS.withTargetLayout(ITfDocumentMgr.addressLayout()));
             threadManager.AssociateFocus(MemorySegment.ofAddress(hwnd), isFocused ? documentMgrPtr : MemorySegment.NULL, prevDocumentMgrHolder);
             var prevDocumentMgr = prevDocumentMgrHolder.get(ITfDocumentMgr.addressLayout(), 0);
-            LOGGER.info("Set focused: previous ITfDocumentMgr={}", prevDocumentMgr);
+            LOGGER.info("Set focused {}: previous ITfDocumentMgr={}", isFocused, prevDocumentMgr);
+            ITfDocumentMgr.wrap(prevDocumentMgr).Release();
         }
     }
 
@@ -245,18 +250,20 @@ public class Manager {
         private final static MemorySegment[] implementedIIDs = {IUnknown.iid(), ITfContextOwnerCompositionSink.iid(), ITextStoreACP2.iid()};
 
         private MemorySegment thisPointer2;
-
         private MemorySegment sinkPtr;
         private ITextStoreACPSink sink;
 
-
         private final StringBuilder buffer = new StringBuilder();
-        private int cursorPos;
+        private Selection cursor = new Selection(0, 0);
+
         private boolean editLock;
         private int pendingLock; // Ignore the warning! The static analyzing failed when crossing ffi bounding
 
         public TextStore() {
             super(implementedIIDs);
+        }
+
+        private record Selection(int start, int end) {
         }
 
         public void setThisPointer2(MemorySegment thisPointer2) {
@@ -273,25 +280,29 @@ public class Manager {
                 AddRef();
                 return 0;
             }
-            return super.QueryInterface(riid, ppvObject);
+            int ret = super.QueryInterface(riid, ppvObject);
+            if (ret != 0) {
+                LOGGER.warn("QueryInterface {} failed: {}", Guid.toString(riid), new WindowsException(ret));
+            }
+            return ret;
         }
 
         @Override
         public int OnStartComposition(MemorySegment pComposition, MemorySegment pfOk) {
-            LOGGER.debug("OnStartComposition");
+            LOGGER.info("OnStartComposition");
             pfOk.set(JAVA_BOOLEAN, 0, true);
             return 0;
         }
 
         @Override
         public int OnUpdateComposition(MemorySegment pComposition, MemorySegment pRangeNew) {
-            LOGGER.debug("OnUpdateComposition");
+            LOGGER.info("OnUpdateComposition");
             return 0;
         }
 
         @Override
         public int OnEndComposition(MemorySegment pComposition) {
-            LOGGER.debug("OnEndComposition");
+            LOGGER.info("OnEndComposition");
             try (var arena = Arena.ofConfined()) {
                 var composition = ITfCompositionView.wrap(pComposition);
                 var rangeHolder = arena.allocate(ADDRESS.withTargetLayout(ITfRange.addressLayout()));
@@ -301,10 +312,12 @@ public class Manager {
                 }
 
                 var range = ITfRange.wrap(rangeHolder.get(ITfRange.addressLayout(), 0));
-                char[] buffer = new char[128];
+                var buffer = arena.allocate(JAVA_CHAR, 128);
                 var cchHolder = arena.allocate(JAVA_INT);
-                range.GetText(editCookie, TF_TF_IGNOREEND, MemorySegment.ofArray(buffer), buffer.length, cchHolder);
-                var compositionResult = String.valueOf(buffer, 0, cchHolder.get(JAVA_INT, 0));
+                range.GetText(editCookie, TF_TF_IGNOREEND, buffer, 128, cchHolder);
+                var cch = cchHolder.get(JAVA_INT, 0);
+                var chars = buffer.reinterpret(JAVA_CHAR.byteSize() * cch).toArray(JAVA_CHAR);
+                var compositionResult = String.valueOf(chars);
 
                 LOGGER.info("Composition result: {}", compositionResult);
 
@@ -404,14 +417,16 @@ public class Manager {
                     pcFetched.set(JAVA_INT, 0, 0);
                     return 0;
                 }
-                TS_SELECTION_ACP.acpStart(pSelection, cursorPos);
-                TS_SELECTION_ACP.acpEnd(pSelection, cursorPos);
+                LOGGER.info("GetSelection: {}", debugBuffer());
+                TS_SELECTION_ACP.acpStart(pSelection, cursor.start);
+                TS_SELECTION_ACP.acpEnd(pSelection, cursor.end);
                 try (var arena = Arena.ofConfined()) {
                     var style = arena.allocate(TS_SELECTIONSTYLE.layout());
                     TS_SELECTIONSTYLE.ase(style, TsActiveSelEnd.TS_AE_END);
                     TS_SELECTIONSTYLE.fInterimChar(style, 0);
                     TS_SELECTION_ACP.style(pSelection, style); // TODO: set value inplace
                 }
+                pcFetched.set(JAVA_INT, 0, 1);
             }
             return 0;
         }
@@ -422,16 +437,14 @@ public class Manager {
                 if (!editLock) {
                     return TS_E_NOLOCK;
                 }
-                if ((ulCount & 0xFFFFFFFFL) < 1) {
+                if ((ulCount & 0xFFFFFFFFL) != 1) {
                     return E_FAIL;
                 }
-                int start = TS_SELECTION_ACP.acpStart(pSelection);
-                int end = TS_SELECTION_ACP.acpEnd(pSelection);
+                cursor = new Selection(TS_SELECTION_ACP.acpStart(pSelection), TS_SELECTION_ACP.acpEnd(pSelection));
                 var style = TS_SELECTION_ACP.style(pSelection);
-                switch (TS_SELECTIONSTYLE.ase(style)) {
-                    case TsActiveSelEnd.TS_AE_NONE, TsActiveSelEnd.TS_AE_END -> cursorPos = end;
-                    case TsActiveSelEnd.TS_AE_START -> cursorPos = start;
-                }
+                var ase = TS_SELECTIONSTYLE.ase(style);
+                var interim = TS_SELECTIONSTYLE.fInterimChar(style);
+                LOGGER.info("SetSelection: {}, ase={}, interim={}", debugBuffer(), ase, interim);
             }
             return 0;
         }
@@ -449,7 +462,7 @@ public class Manager {
                     return TF_E_INVALIDPOS;
                 }
 
-                LOGGER.info("GetText: {}", buffer.substring(acpStart, acpEnd));
+                LOGGER.info("GetText: {}", debugBuffer());
 
                 var chars = new char[acpEnd - acpStart];
                 buffer.getChars(acpStart, acpEnd, chars, 0);
@@ -474,20 +487,41 @@ public class Manager {
                 if (!editLock) {
                     return TS_E_NOLOCK;
                 }
-                if (acpEnd == 1) {
-                    acpEnd = acpStart;
-                }
+                LOGGER.info("SetText: {}, {}", acpStart, acpEnd);
 
-                var chars = new char[cch];
-                MemorySegment.copy(pchText.reinterpret(JAVA_CHAR.byteSize() * cch), 0, MemorySegment.ofArray(chars), 0, JAVA_CHAR.byteSize() * cch);
+                var chars = pchText.reinterpret(JAVA_CHAR.byteSize() * cch).toArray(JAVA_CHAR);
                 var replacement = String.valueOf(chars);
-                buffer.replace(acpStart, acpEnd, replacement);
 
-                LOGGER.info("SetText: {}", replacement);
+                LOGGER.info("SetText before: {}", debugBuffer());
+                buffer.replace(acpStart, acpEnd, replacement);
+                int newEnd = acpStart + cch;
+
+                // Fix selections. TODO: Related to gravity
+                {
+                    int delta = cch - (acpEnd - acpStart);
+                    int start = cursor.start, end = cursor.end;
+                    if (end < acpStart) {
+                        // Do nothing
+                    } else if (start < acpStart && end < acpEnd) {
+                        end = acpStart;
+                    } else if (start < acpStart) {
+                        end += delta;
+                    } else if (start < acpEnd && end < acpEnd) {
+                        start = end = newEnd;
+                    } else if (start < acpEnd) {
+                        start = newEnd;
+                        end += delta;
+                    } else {
+                        start += delta;
+                        end += delta;
+                    }
+                    cursor = new Selection(start, end);
+                }
+                LOGGER.info("SetText after: {}", debugBuffer());
 
                 TS_TEXTCHANGE.acpStart(pChange, acpStart);
                 TS_TEXTCHANGE.acpOldEnd(pChange, acpEnd);
-                TS_TEXTCHANGE.acpNewEnd(pChange, acpStart + cch);
+                TS_TEXTCHANGE.acpNewEnd(pChange, newEnd);
             }
             return 0;
         }
@@ -535,10 +569,11 @@ public class Manager {
 
         @Override
         public int RequestSupportedAttrs(int dwFlags, int cFilterAttrs, MemorySegment paFilterAttrs) {
-//            var filterAttrsLayout = MemoryLayout.sequenceLayout(cFilterAttrs, Guid.layout());
-//            for (int i = 0; i < filterAttrsLayout.elementCount(); i++) {
-//                LOGGER.debug("Request supported attributs: {}", paFilterAttrs.get(ADDRESS.withTargetLayout(Guid.layout()), i));
-//            }
+            var elemSize = system.Guid.layout().byteSize();
+            paFilterAttrs = paFilterAttrs.reinterpret(elemSize * cFilterAttrs);
+            paFilterAttrs.elements(system.Guid.layout()).forEach(elem -> {
+                LOGGER.info("Request supported attributes: {}", Guid.toString(elem));
+            });
             return 0;
         }
 
@@ -576,12 +611,7 @@ public class Manager {
 
         @Override
         public int GetActiveView(MemorySegment pvcView) {
-            synchronized (buffer) {
-                if (!editLock) {
-                    return TS_E_NOLOCK;
-                }
-                pvcView.set(JAVA_INT, 0, 0); // TODO: What is a TsViewCookie?
-            }
+            pvcView.set(JAVA_INT, 0, 0); // TODO: What is a TsViewCookie?
             return 0;
         }
 
@@ -597,7 +627,19 @@ public class Manager {
 
         @Override
         public int GetScreenExt(int vcView, MemorySegment prc) {
-            return TS_E_NOLAYOUT;
+            RECT.left(prc, 0);
+            RECT.top(prc, 0);
+            RECT.right(prc, 100);
+            RECT.bottom(prc, 100);
+            return 0;
+        }
+
+        private String debugBuffer() {
+            return String.format("%s<anchor>%s</anchor>%s",
+                    buffer.substring(0, cursor.start),
+                    buffer.substring(cursor.start, cursor.end),
+                    buffer.substring(cursor.end)
+            );
         }
     }
 }
