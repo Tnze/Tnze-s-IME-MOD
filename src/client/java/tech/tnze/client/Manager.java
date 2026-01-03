@@ -7,7 +7,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
-import net.minecraft.client.renderer.Rect2i;
 import tech.tnze.msctf.*;
 import windows.win32.foundation.RECT;
 import windows.win32.system.com.Apis;
@@ -32,7 +31,8 @@ import java.util.*;
 public class Manager {
     public static final TreeMap<Integer, Renderable> uiElements = new TreeMap<>();
 
-    private static Manager instance = null;;
+    private static Manager instance = null;
+    private TextStore textStore;
     int anchorX, anchorY, cursorX;
 
     public synchronized static Manager getInstance() {
@@ -106,11 +106,11 @@ public class Manager {
 
         // Create Context
         try (var arena = Arena.ofConfined()) {
-            var sink = new TextStore();
-            var sinkUpcallWrapper = ITfContextOwnerCompositionSink.create(sink, Arena.global());
-            var sinkUpcallWrapper2 = ITextStoreACP2.create(sink, Arena.global());
-            sink.setThisPointer(sinkUpcallWrapper);
-            sink.setThisPointer2(sinkUpcallWrapper2);
+            textStore = new TextStore();
+            var sinkUpcallWrapper = ITfContextOwnerCompositionSink.create(textStore, Arena.global());
+            var sinkUpcallWrapper2 = ITextStoreACP2.create(textStore, Arena.global());
+            textStore.setThisPointer(sinkUpcallWrapper);
+            textStore.setThisPointer2(sinkUpcallWrapper2);
 
             var contextHolder = arena.allocate(ADDRESS.withTargetLayout(ITfContext.addressLayout()));
             var editCookieHolder = arena.allocate(JAVA_INT);
@@ -131,6 +131,11 @@ public class Manager {
 
     public void setFocus(boolean isFocused) {
         try (var arena = Arena.ofConfined()) {
+            if (!isFocused) {
+                // TODO: or we can work with IME Blocker?
+                setPosition(0, 0, 0);
+                return;
+            }
             var prevDocumentMgrHolder = arena.allocate(ADDRESS.withTargetLayout(ITfDocumentMgr.addressLayout()));
             threadManager.AssociateFocus(MemorySegment.ofAddress(hwnd), isFocused ? documentMgrPtr : MemorySegment.NULL, prevDocumentMgrHolder);
             var prevDocumentMgr = prevDocumentMgrHolder.get(ITfDocumentMgr.addressLayout(), 0);
@@ -145,6 +150,10 @@ public class Manager {
         this.anchorX = x;
         this.anchorY = y;
         this.cursorX = curserX;
+    }
+
+    public String getComposition() {
+        return textStore.buffer.toString();
     }
 
     private class UIElementSink extends ComObject implements ITfUIElementSink {
@@ -177,6 +186,10 @@ public class Manager {
                         uiElements.put(dwUIElementId, candidateList);
                     }
                     candidateListUIElement.Release();
+                } else {
+                    var guidHolder = arena.allocate(system.Guid.layout());
+                    checkResult(uiElement.GetGUID(guidHolder));
+                    LOGGER.warn("Unsupported UIElement: {}", Guid.toString(guidHolder));
                 }
 
                 uiElement.Release();
@@ -314,6 +327,13 @@ public class Manager {
         @Override
         public int OnUpdateComposition(MemorySegment pComposition, MemorySegment pRangeNew) {
             LOGGER.debug("OnUpdateComposition");
+            synchronized (uiElements) {
+                for (var uiElement : uiElements.values()) {
+                    if (uiElement instanceof CandidateList candidateList) {
+                        candidateList.setComposition(getComposition());
+                    }
+                }
+            }
             return 0;
         }
 
@@ -341,10 +361,8 @@ public class Manager {
                 LOGGER.info("Composition result: {}", compositionResult);
                 // Reset the buffer
                 synchronized (this.buffer) {
-                    if (!editLock) {
-                        this.buffer.setLength(0);
-                        this.cursor = new Selection(0, 0);
-                    }
+                    this.buffer.setLength(0);
+                    this.cursor = new Selection(0, 0);
                 }
 
                 var minecraft = Minecraft.getInstance();
@@ -558,7 +576,7 @@ public class Manager {
                     }
                     cursor = new Selection(start, end);
                 }
-                LOGGER.debug("SetText after: {}", debugBuffer());
+                LOGGER.info("SetText after: {}", debugBuffer());
 
                 TS_TEXTCHANGE.acpStart(pChange, acpStart);
                 TS_TEXTCHANGE.acpOldEnd(pChange, acpEnd);
@@ -613,7 +631,7 @@ public class Manager {
             var elemSize = system.Guid.layout().byteSize();
             paFilterAttrs = paFilterAttrs.reinterpret(elemSize * cFilterAttrs);
             paFilterAttrs.elements(system.Guid.layout()).forEach(elem -> {
-                LOGGER.info("Request supported attributes: {}", Guid.toString(elem));
+                LOGGER.debug("Request supported attributes: {}", Guid.toString(elem));
             });
             return 0;
         }

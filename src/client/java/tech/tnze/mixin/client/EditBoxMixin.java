@@ -57,7 +57,7 @@ public class EditBoxMixin {
 
     @Inject(method = "setFocused(Z)V", at = @At("TAIL"))
     public void tnze$setFocused(boolean focused, CallbackInfo ci) {
-        LOGGER.info("EditBox focused state changed: {}", focused);
+        LOGGER.debug("EditBox focused state changed: {}", focused);
         Manager.getInstance().setFocus(focused);
     }
 }

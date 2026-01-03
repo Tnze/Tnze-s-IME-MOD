@@ -20,6 +20,7 @@ public class CandidateList implements Renderable {
     private MutableComponent displayComponent = Component.empty();
     private final Style selectedItemStyle = Style.EMPTY.withColor(0xFFFFFF00).withUnderlined(true);
     private int anchorX, anchorY;
+    private String compositionText;
 
     CandidateList(Minecraft minecraft) {
         this.minecraft = minecraft;
@@ -61,6 +62,10 @@ public class CandidateList implements Renderable {
         anchorY = y;
     }
 
+    public void setComposition(String text) {
+        compositionText = text;
+    }
+
     private Rect2i relocate(int width, int height, int guiWidth, int guiHeight) {
         Rect2i rect = new Rect2i(anchorX, anchorY, width, height);
 
@@ -94,6 +99,17 @@ public class CandidateList implements Renderable {
 
         renderBackground(gg, rect);
         gg.drawString(font, displayComponent, rect.getX(), rect.getY(), 0xFFE0E0E0);
+
+        var bounds = new Rect2i(rect.getX(), rect.getY() - paddings[0] - font.lineHeight, font.width(compositionText), font.lineHeight);
+        gg.fill(
+                bounds.getX() - paddings[0],
+                bounds.getY() - paddings[1],
+                bounds.getX() + bounds.getWidth() + paddings[2],
+                bounds.getY() + bounds.getHeight(),
+                minecraft.options.getBackgroundColor(Integer.MIN_VALUE)
+        );
+        gg.drawString(font, compositionText, bounds.getX(), bounds.getY(), 0xFFE0E0E0);
+
     }
 
     private void renderBackground(@NonNull GuiGraphics gg, Rect2i bounds) {
