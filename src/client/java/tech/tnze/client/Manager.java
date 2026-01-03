@@ -7,6 +7,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.renderer.Rect2i;
 import tech.tnze.msctf.*;
 import windows.win32.foundation.RECT;
 import windows.win32.system.com.Apis;
@@ -31,7 +32,8 @@ import java.util.*;
 public class Manager {
     public static final TreeMap<Integer, Renderable> uiElements = new TreeMap<>();
 
-    private static Manager instance = null;
+    private static Manager instance = null;;
+    int anchorX, anchorY, cursorX;
 
     public synchronized static Manager getInstance() {
         if (instance == null) {
@@ -54,6 +56,7 @@ public class Manager {
 
     public void init(long hwnd) {
         this.hwnd = hwnd;
+
         // Create ITfThreadMgr
         try (var arena = Arena.ofConfined()) {
             var threadMgrHolder = arena.allocate(ADDRESS.withTargetLayout(ITfThreadMgrEx.addressLayout()));
@@ -66,7 +69,7 @@ public class Manager {
             var clientIdHolder = arena.allocate(JAVA_INT);
             checkResult(threadManager.ActivateEx(clientIdHolder, TF_TMAE_UIELEMENTENABLEDONLY));
             clientId = clientIdHolder.get(JAVA_INT, 0);
-            LOGGER.info("ITfThreadManager client id: {}", clientId);
+            LOGGER.debug("ITfThreadManager client id: {}", clientId);
         }
 
         // Query ITfUIElementMgr
@@ -90,7 +93,7 @@ public class Manager {
             checkResult(source.AdviseSink(ITfUIElementSink.iid(), sinkUpcallWrapper, cookieHolder));
             source.Release();
 
-            LOGGER.info("UIElementSink cookie={}", cookieHolder.get(JAVA_INT, 0));
+            LOGGER.debug("UIElementSink cookie={}", cookieHolder.get(JAVA_INT, 0));
         }
 
         // Create ITfDocumentMgr
@@ -116,7 +119,7 @@ public class Manager {
             contextPtr = contextHolder.get(ITfContext.addressLayout(), 0);
             context = ITfContext.wrap(contextPtr);
             editCookie = editCookieHolder.get(JAVA_INT, 0);
-            LOGGER.info("Edit cookie={}", editCookie);
+            LOGGER.debug("Edit cookie={}", editCookie);
 
             // Push Context
             checkResult(documentMgr.Push(contextPtr));
@@ -131,11 +134,17 @@ public class Manager {
             var prevDocumentMgrHolder = arena.allocate(ADDRESS.withTargetLayout(ITfDocumentMgr.addressLayout()));
             threadManager.AssociateFocus(MemorySegment.ofAddress(hwnd), isFocused ? documentMgrPtr : MemorySegment.NULL, prevDocumentMgrHolder);
             var prevDocumentMgr = prevDocumentMgrHolder.get(ITfDocumentMgr.addressLayout(), 0);
-            LOGGER.info("Set focused {}: previous ITfDocumentMgr={}", isFocused, prevDocumentMgr);
+            LOGGER.debug("Set focused {}: previous ITfDocumentMgr={}", isFocused, prevDocumentMgr);
             if (prevDocumentMgr.address() != 0) {
                 ITfDocumentMgr.wrap(prevDocumentMgr).Release();
             }
         }
+    }
+
+    public void setPosition(int x, int y, int curserX) {
+        this.anchorX = x;
+        this.anchorY = y;
+        this.cursorX = curserX;
     }
 
     private class UIElementSink extends ComObject implements ITfUIElementSink {
@@ -147,7 +156,7 @@ public class Manager {
 
         @Override
         public int BeginUIElement(int dwUIElementId, MemorySegment pbShow) {
-            LOGGER.info("BeginUIElement {}", dwUIElementId);
+            LOGGER.debug("BeginUIElement {}", dwUIElementId);
             try (var arena = Arena.ofConfined()) {
                 var uiElementHolder = arena.allocate(ADDRESS.withTargetLayout(ITfUIElement.addressLayout()));
                 int result = uiElementMgr.GetUIElement(dwUIElementId, uiElementHolder);
@@ -164,6 +173,7 @@ public class Manager {
                     var candidateListUIElement = ITfCandidateListUIElement.wrap(candidateListUIElementHolder.get(ITfCandidateListUIElement.addressLayout(), 0));
                     synchronized (uiElements) {
                         var candidateList = new CandidateList(Minecraft.getInstance());
+                        candidateList.setAnchor(cursorX, anchorY);
                         uiElements.put(dwUIElementId, candidateList);
                     }
                     candidateListUIElement.Release();
@@ -176,7 +186,7 @@ public class Manager {
 
         @Override
         public int UpdateUIElement(int dwUIElementId) {
-            LOGGER.info("UpdateUIElement {}", dwUIElementId);
+            LOGGER.debug("UpdateUIElement {}", dwUIElementId);
             try (var arena = Arena.ofConfined()) {
                 var uiElementHolder = arena.allocate(ADDRESS.withTargetLayout(ITfUIElement.addressLayout()));
                 int result = uiElementMgr.GetUIElement(dwUIElementId, uiElementHolder);
@@ -205,7 +215,7 @@ public class Manager {
 
         @Override
         public int EndUIElement(int dwUIElementId) {
-            LOGGER.info("EndUIElement {}", dwUIElementId);
+            LOGGER.debug("EndUIElement {}", dwUIElementId);
             synchronized (uiElements) {
                 uiElements.remove(dwUIElementId);
             }
@@ -296,20 +306,20 @@ public class Manager {
 
         @Override
         public int OnStartComposition(MemorySegment pComposition, MemorySegment pfOk) {
-            LOGGER.info("OnStartComposition");
+            LOGGER.debug("OnStartComposition");
             pfOk.set(JAVA_BOOLEAN, 0, true);
             return 0;
         }
 
         @Override
         public int OnUpdateComposition(MemorySegment pComposition, MemorySegment pRangeNew) {
-            LOGGER.info("OnUpdateComposition");
+            LOGGER.debug("OnUpdateComposition");
             return 0;
         }
 
         @Override
         public int OnEndComposition(MemorySegment pComposition) {
-            LOGGER.info("OnEndComposition");
+            LOGGER.debug("OnEndComposition");
             try (var arena = Arena.ofConfined()) {
                 var composition = ITfCompositionView.wrap(pComposition);
                 var rangeHolder = arena.allocate(ADDRESS.withTargetLayout(ITfRange.addressLayout()));
@@ -322,11 +332,20 @@ public class Manager {
                 var buffer = arena.allocate(JAVA_CHAR, 128);
                 var cchHolder = arena.allocate(JAVA_INT);
                 range.GetText(editCookie, TF_TF_IGNOREEND, buffer, 128, cchHolder);
+                range.Release();
+
                 var cch = cchHolder.get(JAVA_INT, 0);
                 var chars = buffer.reinterpret(JAVA_CHAR.byteSize() * cch).toArray(JAVA_CHAR);
                 var compositionResult = String.valueOf(chars);
 
                 LOGGER.info("Composition result: {}", compositionResult);
+                // Reset the buffer
+                synchronized (this.buffer) {
+                    if (!editLock) {
+                        this.buffer.setLength(0);
+                        this.cursor = new Selection(0, 0);
+                    }
+                }
 
                 var minecraft = Minecraft.getInstance();
                 minecraft.execute(() -> {
@@ -348,7 +367,6 @@ public class Manager {
                     }
                 });
 
-                range.Release();
             }
             return 0;
         }
@@ -444,7 +462,6 @@ public class Manager {
                     pcFetched.set(JAVA_INT, 0, 0);
                     return 0;
                 }
-                LOGGER.info("GetSelection: {}", debugBuffer());
                 TS_SELECTION_ACP.acpStart(pSelection, cursor.start);
                 TS_SELECTION_ACP.acpEnd(pSelection, cursor.end);
                 try (var arena = Arena.ofConfined()) {
@@ -471,7 +488,7 @@ public class Manager {
                 var style = TS_SELECTION_ACP.style(pSelection);
                 var ase = TS_SELECTIONSTYLE.ase(style);
                 var interim = TS_SELECTIONSTYLE.fInterimChar(style);
-                LOGGER.info("SetSelection: {}, ase={}, interim={}", debugBuffer(), ase, interim);
+                LOGGER.debug("SetSelection: {}, ase={}, interim={}", debugBuffer(), ase, interim);
             }
             return 0;
         }
@@ -488,8 +505,6 @@ public class Manager {
                 if (acpStart < 0 || acpStart > buffer.length() || acpEnd < acpStart || acpEnd > buffer.length()) {
                     return TF_E_INVALIDPOS;
                 }
-
-                LOGGER.info("GetText: {}", debugBuffer());
 
                 var chars = new char[acpEnd - acpStart];
                 buffer.getChars(acpStart, acpEnd, chars, 0);
@@ -514,12 +529,11 @@ public class Manager {
                 if (!editLock) {
                     return TS_E_NOLOCK;
                 }
-                LOGGER.info("SetText: {}, {}", acpStart, acpEnd);
 
                 var chars = pchText.reinterpret(JAVA_CHAR.byteSize() * cch).toArray(JAVA_CHAR);
                 var replacement = String.valueOf(chars);
 
-                LOGGER.info("SetText before: {}", debugBuffer());
+                LOGGER.debug("SetText before: {}", debugBuffer());
                 buffer.replace(acpStart, acpEnd, replacement);
                 int newEnd = acpStart + cch;
 
@@ -544,7 +558,7 @@ public class Manager {
                     }
                     cursor = new Selection(start, end);
                 }
-                LOGGER.info("SetText after: {}", debugBuffer());
+                LOGGER.debug("SetText after: {}", debugBuffer());
 
                 TS_TEXTCHANGE.acpStart(pChange, acpStart);
                 TS_TEXTCHANGE.acpOldEnd(pChange, acpEnd);
@@ -662,7 +676,13 @@ public class Manager {
         }
 
         private String debugBuffer() {
-            return String.format("%s<anchor>%s</anchor>%s",
+            if (cursor.start == cursor.end) {
+                return String.format("%s<sl/>%s",
+                        buffer.substring(0, cursor.start),
+                        buffer.substring(cursor.end)
+                );
+            }
+            return String.format("%s<sl>%s</sl>%s",
                     buffer.substring(0, cursor.start),
                     buffer.substring(cursor.start, cursor.end),
                     buffer.substring(cursor.end)

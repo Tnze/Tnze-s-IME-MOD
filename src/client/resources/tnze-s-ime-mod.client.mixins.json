@@ -5,7 +5,6 @@
   "compatibilityLevel": "JAVA_23",
   "client": [
     "EditBoxMixin",
-    "InputConstantsMixin",
     "MinecraftMixin",
     "ScreenMixin"
   ],

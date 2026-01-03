@@ -15,12 +15,11 @@ public class CandidateList implements Renderable {
 
     private final Minecraft minecraft;
     private final int[] paddings = new int[]{3, 3, 2, 2};
-    private final int screenMargin = 4;
+    private final int screenMargin = 5;
     int totalCount, pageCount, currentPage, currentSelection;
     private MutableComponent displayComponent = Component.empty();
     private final Style selectedItemStyle = Style.EMPTY.withColor(0xFFFFFF00).withUnderlined(true);
-
-    int anchorX, anchorY;
+    private int anchorX, anchorY;
 
     CandidateList(Minecraft minecraft) {
         this.minecraft = minecraft;
@@ -28,8 +27,6 @@ public class CandidateList implements Renderable {
         pageCount = 0;
         currentPage = 0;
         currentSelection = 0;
-
-        setAnchor(50, 50);
     }
 
     public void setState(int totalCount, int pageCount, int currentPage, String[] currentPageContent, int currentSelection) {
@@ -66,6 +63,13 @@ public class CandidateList implements Renderable {
 
     private Rect2i relocate(int width, int height, int guiWidth, int guiHeight) {
         Rect2i rect = new Rect2i(anchorX, anchorY, width, height);
+
+        if (guiHeight - anchorY < 30) { // The text box is on the bottom of screen
+            rect.setY(rect.getY() - height - 6);
+        } else {
+            rect.setY(rect.getY() + height + 6);
+        }
+
         if (width >= guiWidth || height >= guiHeight) {
             // too large for relocation
             return rect;
@@ -85,8 +89,6 @@ public class CandidateList implements Renderable {
 
     @Override
     public void render(@NonNull GuiGraphics gg, int mouseX, int mouseY, float delta) {
-        setAnchor(mouseX, mouseY); // TODO: Debug only
-
         Font font = minecraft.font;
         Rect2i rect = relocate(font.width(displayComponent), font.lineHeight, gg.guiWidth(), gg.guiHeight());
 

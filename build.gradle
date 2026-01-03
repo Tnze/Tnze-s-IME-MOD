@@ -39,7 +39,8 @@ dependencies {
 
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
-    clientImplementation(project(":msctf"))
+    implementation(project(":msctf"))
+    include(project(":msctf"))
 }
 
 processResources {
