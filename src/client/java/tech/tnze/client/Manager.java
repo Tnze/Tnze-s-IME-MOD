@@ -8,21 +8,21 @@ import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
 import tech.tnze.msctf.*;
-import windows.win32.foundation.RECT;
-import windows.win32.system.com.Apis;
-import windows.win32.system.com.CLSCTX;
-import windows.win32.system.com.IUnknown;
-import windows.win32.ui.textservices.*;
+import tech.tnze.msctf.windows.win32.foundation.RECT;
+import tech.tnze.msctf.windows.win32.system.com.Apis;
+import tech.tnze.msctf.windows.win32.system.com.CLSCTX;
+import tech.tnze.msctf.windows.win32.system.com.IUnknown;
+import tech.tnze.msctf.windows.win32.ui.textservices.*;
 
 import static com.sun.jna.platform.win32.WinError.E_FAIL;
 import static com.sun.jna.platform.win32.WinError.E_NOTIMPL;
 import static java.lang.foreign.ValueLayout.*;
 import static tech.tnze.client.IMEClient.LOGGER;
 import static tech.tnze.msctf.WindowsException.checkResult;
-import static windows.win32.foundation.Apis.*;
-import static windows.win32.foundation.Constants.*;
-import static windows.win32.system.ole.Constants.*;
-import static windows.win32.ui.textservices.Constants.*;
+import static tech.tnze.msctf.windows.win32.foundation.Apis.*;
+import static tech.tnze.msctf.windows.win32.foundation.Constants.*;
+import static tech.tnze.msctf.windows.win32.system.ole.Constants.*;
+import static tech.tnze.msctf.windows.win32.ui.textservices.Constants.*;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -187,7 +187,7 @@ public class Manager {
                     }
                     candidateListUIElement.Release();
                 } else {
-                    var guidHolder = arena.allocate(system.Guid.layout());
+                    var guidHolder = arena.allocate(tech.tnze.msctf.system.Guid.layout());
                     checkResult(uiElement.GetGUID(guidHolder));
                     LOGGER.warn("Unsupported UIElement: {}", Guid.toString(guidHolder));
                 }
@@ -628,9 +628,9 @@ public class Manager {
 
         @Override
         public int RequestSupportedAttrs(int dwFlags, int cFilterAttrs, MemorySegment paFilterAttrs) {
-            var elemSize = system.Guid.layout().byteSize();
+            var elemSize = tech.tnze.msctf.system.Guid.layout().byteSize();
             paFilterAttrs = paFilterAttrs.reinterpret(elemSize * cFilterAttrs);
-            paFilterAttrs.elements(system.Guid.layout()).forEach(elem -> {
+            paFilterAttrs.elements(tech.tnze.msctf.system.Guid.layout()).forEach(elem -> {
                 LOGGER.debug("Request supported attributes: {}", Guid.toString(elem));
             });
             return 0;

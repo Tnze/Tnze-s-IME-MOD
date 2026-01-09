@@ -1,12 +1,19 @@
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
 plugins {
     id("java")
-    id("net.codecrete.windows-api") version "0.8.2"
+    id("net.codecrete.windows-api") version "0.8.4"
 }
 
 group = rootProject.group
 version = rootProject.version
 
 tasks.generateWindowsApi {
+    basePackage = "tech.tnze.msctf"
+    options = listOf("noSystemLoadLibrary")
     functions = listOf(
         "CoInitializeEx",
         "CoUninitialize",
@@ -75,10 +82,6 @@ java {
     if (JavaVersion.current() < javaVersion) {
         toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
     }
-}
-
-repositories {
-    mavenCentral()
 }
 
 dependencies {

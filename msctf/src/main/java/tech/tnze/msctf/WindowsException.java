@@ -2,9 +2,9 @@ package tech.tnze.msctf;
 
 import java.lang.foreign.*;
 
-import static windows.win32.foundation.Apis.LocalFree;
-import static windows.win32.system.diagnostics.debug.FORMAT_MESSAGE_OPTIONS.*;
-import static windows.win32.system.diagnostics.debug.Apis.FormatMessageW;
+import static tech.tnze.msctf.windows.win32.foundation.Apis.LocalFree;
+import static tech.tnze.msctf.windows.win32.system.diagnostics.debug.FORMAT_MESSAGE_OPTIONS.*;
+import static tech.tnze.msctf.windows.win32.system.diagnostics.debug.Apis.FormatMessageW;
 
 public class WindowsException extends RuntimeException {
     private int hr; // HRESULT

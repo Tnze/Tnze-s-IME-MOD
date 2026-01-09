@@ -7,14 +7,14 @@
 package tech.tnze.msctf;
 
 
-import windows.win32.system.com.IUnknown;
+import tech.tnze.msctf.windows.win32.system.com.IUnknown;
 
 import java.lang.foreign.MemorySegment;
 
 import static java.lang.foreign.ValueLayout.ADDRESS;
 import static java.lang.foreign.ValueLayout.JAVA_LONG;
-import static windows.win32.foundation.Constants.E_POINTER;
-import static windows.win32.foundation.Constants.E_NOINTERFACE;
+import static tech.tnze.msctf.windows.win32.foundation.Constants.E_POINTER;
+import static tech.tnze.msctf.windows.win32.foundation.Constants.E_NOINTERFACE;
 
 /**
  * Base class for COM objects implemented in Kotlin.

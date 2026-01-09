@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
+import java.util.List;
 
 public class IMEClient implements ClientModInitializer {
     public static final String MOD_ID = "tnze-s-ime-mod";
@@ -22,24 +23,10 @@ public class IMEClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         LOGGER.info("Tnze's IME mod is initializing");
-
-        // Load native library here
-//        loadNativeLibrary();
-//        LOGGER.debug("Load native library success");
-
+        var windir = System.getenv("windir");
+        for (var lib : List.of("KERNEL32.dll", "OLEAUT32.dll", "OLE32.dll")) {
+            var path = Path.of(windir, "System32", lib);
+            System.load(path.toString());
+        }
     }
-
-//    private void loadNativeLibrary() {
-//        try (InputStream src = getClass().getResourceAsStream("/natives/msctf-jni.dll")) {
-//            if (src == null) {
-//                throw new RuntimeException("Native library resource not found");
-//            }
-//            Path tmp = Files.createTempFile(MOD_ID, "-jni.dll");
-//            Files.copy(src, tmp, StandardCopyOption.REPLACE_EXISTING);
-//            LOGGER.debug("Native library copied to {}", tmp);
-//            System.load(tmp.toAbsolutePath().toString());
-//        } catch (IOException e) {
-//            throw new RuntimeException(e);
-//        }
-//    }
 }
