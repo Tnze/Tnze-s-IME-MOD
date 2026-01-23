@@ -13,7 +13,6 @@ version = rootProject.version
 
 tasks.generateWindowsApi {
     basePackage = "tech.tnze.msctf"
-    options = listOf("noSystemLoadLibrary")
     functions = listOf(
         "CoInitializeEx",
         "CoUninitialize",
