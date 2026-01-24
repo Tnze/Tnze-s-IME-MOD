@@ -9,6 +9,7 @@
   "license": "MIT",
   "icon": "assets/tnze-s-ime-mod/icon.png",
   "environment": "client",
+  "accessWidener": "tnze-s-ime-mod.accesswidener",
   "entrypoints": {
     "client": [
       "tech.tnze.client.IMEClient"

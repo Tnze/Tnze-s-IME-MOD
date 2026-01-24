@@ -100,7 +100,7 @@ public class ComObject implements IUnknown {
         return refCount;
     }
 
-    protected static boolean equalIIDs(MemorySegment iid1, MemorySegment iid2) {
+    public static boolean equalIIDs(MemorySegment iid1, MemorySegment iid2) {
         return iid1.get(JAVA_LONG, 0L) == iid2.get(JAVA_LONG, 0L) && iid1.get(JAVA_LONG, 8L) == iid2.get(JAVA_LONG, 8L);
     }
 }

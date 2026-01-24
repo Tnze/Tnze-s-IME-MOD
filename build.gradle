@@ -21,6 +21,7 @@ loom {
     }
 
     log4jConfigs.from file("src/main/resources/log4j.xml")
+    accessWidenerPath = file("src/main/resources/tnze-s-ime-mod.accesswidener")
 }
 
 repositories {

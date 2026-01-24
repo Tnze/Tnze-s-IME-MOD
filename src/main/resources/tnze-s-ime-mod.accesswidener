@@ -1,0 +1,12 @@
+accessWidener v2 named
+
+accessible method   net/minecraft/client/gui/components/EditBox isEditable      ()Z
+accessible method   net/minecraft/client/gui/components/EditBox onValueChange   (Ljava/lang/String;)V
+
+accessible field    net/minecraft/client/gui/components/EditBox highlightPos    I
+accessible field    net/minecraft/client/gui/components/EditBox cursorPos       I
+accessible field    net/minecraft/client/gui/components/EditBox textX           I
+accessible field    net/minecraft/client/gui/components/EditBox textY           I
+accessible field    net/minecraft/client/gui/components/EditBox displayPos      I
+accessible field    net/minecraft/client/gui/components/EditBox value           Ljava/lang/String;
+accessible field    net/minecraft/client/gui/components/EditBox font            Lnet/minecraft/client/gui/Font;
