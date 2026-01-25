@@ -174,8 +174,8 @@ public abstract class EditBoxACP implements ITextStoreACP2 {
 
         TS_SELECTION_ACP.acpStart(pSelection, Math.min(editBox.cursorPos, editBox.highlightPos));
         TS_SELECTION_ACP.acpEnd(pSelection, Math.max(editBox.cursorPos, editBox.highlightPos));
-        TS_SELECTION_ACP$style$ase$VH.set(pSelection, editBox.cursorPos > editBox.highlightPos ? TsActiveSelEnd.TS_AE_END : TsActiveSelEnd.TS_AE_START);
-        TS_SELECTION_ACP$style$fInterimChar$VH.set(pSelection, 0);
+        TS_SELECTION_ACP$style$ase$VH.set(pSelection, 0, editBox.cursorPos > editBox.highlightPos ? TsActiveSelEnd.TS_AE_END : TsActiveSelEnd.TS_AE_START);
+        TS_SELECTION_ACP$style$fInterimChar$VH.set(pSelection, 0, 0);
         pcFetched.set(JAVA_INT, 0, 1);
 
         return 0;
@@ -194,7 +194,7 @@ public abstract class EditBoxACP implements ITextStoreACP2 {
 
         int start = TS_SELECTION_ACP.acpStart(pSelection);
         int end = TS_SELECTION_ACP.acpEnd(pSelection);
-        int ase = (int) TS_SELECTION_ACP$style$ase$VH.get(pSelection);
+        int ase = (int) TS_SELECTION_ACP$style$ase$VH.get(pSelection, 0);
 
         if (ase == TsActiveSelEnd.TS_AE_START) {
             editBox.setHighlightPos(end);
@@ -218,7 +218,7 @@ public abstract class EditBoxACP implements ITextStoreACP2 {
             acpEnd = value.length();
         }
         if (acpStart < 0 || acpStart > value.length() || acpEnd < acpStart || acpEnd > value.length()) {
-            return TF_E_INVALIDPOS;
+            return TS_E_INVALIDPOS;
         }
 
         var chars = new char[acpEnd - acpStart];
@@ -419,6 +419,11 @@ public abstract class EditBoxACP implements ITextStoreACP2 {
         if (currentLockState.ordinal() < LockState.ReadOnly.ordinal()) {
             return TS_E_NOLOCK;
         }
+
+        if (acpStart < 0 || acpStart > editBox.value.length() || acpEnd < acpStart || acpEnd > editBox.value.length()) {
+            return TS_E_INVALIDPOS;
+        }
+
         boolean clipped = false;
         if (acpStart < editBox.displayPos) {
             acpStart = editBox.displayPos;
@@ -426,7 +431,6 @@ public abstract class EditBoxACP implements ITextStoreACP2 {
         }
         if (acpEnd < editBox.displayPos) {
             acpEnd = editBox.displayPos;
-            clipped = true;
         }
         int startOffset = editBox.font.width(editBox.value.substring(editBox.displayPos, acpStart));
         int endOffset = editBox.font.width(editBox.value.substring(editBox.displayPos, acpEnd));
@@ -438,7 +442,7 @@ public abstract class EditBoxACP implements ITextStoreACP2 {
         RECT.top(prc, window.getY() + editBox.textY * window.getGuiScale());
         RECT.left(prc, window.getX() + (editBox.textX + startOffset) * window.getGuiScale());
         RECT.right(prc, window.getX() + (editBox.textX + endOffset) * window.getGuiScale());
-        RECT.bottom(prc, window.getX() + (editBox.textY + editBox.font.lineHeight) * window.getGuiScale());
+        RECT.bottom(prc, window.getY() + (editBox.textY + editBox.font.lineHeight) * window.getGuiScale());
 
         pfClipped.set(JAVA_BOOLEAN, 0, clipped);
 

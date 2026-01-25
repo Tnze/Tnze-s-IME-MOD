@@ -69,6 +69,10 @@ tasks.withType(JavaCompile).configureEach {
     }
 }
 
+tasks.named("runClient") {
+    jvmArgs += '-Dmixin.debug.export=true'
+}
+
 java {
     def javaVersion = JavaVersion.toVersion(targetJavaVersion)
     if (JavaVersion.current() < javaVersion) {

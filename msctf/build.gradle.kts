@@ -46,7 +46,7 @@ tasks.generateWindowsApi {
         "CONNECT_E_ADVISELIMIT",
         "TS_E_SYNCHRONOUS",
         "TS_E_NOLOCK",
-        "TF_E_INVALIDPOS",
+        "TS_E_INVALIDPOS",
         "TS_E_INVALIDPOINT",
         "TS_E_NOLAYOUT",
         "TS_S_ASYNC",

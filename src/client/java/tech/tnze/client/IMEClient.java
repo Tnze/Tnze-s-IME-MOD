@@ -23,10 +23,5 @@ public class IMEClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         LOGGER.info("Tnze's IME mod is initializing");
-        var windir = System.getenv("windir");
-        for (var lib : List.of("KERNEL32.dll", "OLEAUT32.dll", "OLE32.dll")) {
-            var path = Path.of(windir, "System32", lib);
-            System.load(path.toString());
-        }
     }
 }
