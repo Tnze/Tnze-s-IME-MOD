@@ -45,7 +45,7 @@ public class Manager {
     private int clientId;
     private ITfUIElementMgr uiElementMgr;
 
-    public void init(Window window, long hwnd) {
+    public synchronized void init(Window window, long hwnd) {
         this.window = window;
         this.hwnd = hwnd;
 
@@ -213,19 +213,23 @@ public class Manager {
 
     public void onScreenAdded(Screen screen) {
         this.documents.put(screen, new HashMap<>());
-        if (screen.isFocused()) {
-            onScreenFocusedOnWidget(screen, screen.getFocused());
-        }
+        onScreenFocusedOnWidget(screen, screen.getFocused());
     }
 
     public void onScreenRemoved(Screen screen) {
+        onScreenFocusedOnWidget(screen, null);
         var contexts = this.documents.remove(screen);
         if (contexts != null) {
             contexts.values().forEach(Document::close);
         }
     }
 
-    public void onScreenFocusedOnWidget(Screen screen, @Nullable GuiEventListener guiEventListener) {
+    public synchronized void onScreenFocusedOnWidget(Screen screen, @Nullable GuiEventListener guiEventListener) {
+        if (threadManager == null) {
+            LOGGER.warn("Not initialized yet");
+            return;
+        }
+
         var entry = documents.get(screen);
         if (entry == null) {
             LOGGER.warn("Screen {} is not added, ignoring its focus: {}", screen, guiEventListener);
@@ -242,6 +246,8 @@ public class Manager {
             }
             documentMgr = document.documentMgrPtr;
         }
+
+        LOGGER.info("AssociateFocus on {}", documentMgr);
 
         try (var arena = Arena.ofConfined()) {
             var prevDocumentMgrHolder = arena.allocate(ADDRESS.withTargetLayout(ITfDocumentMgr.addressLayout()));
