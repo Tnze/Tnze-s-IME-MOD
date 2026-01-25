@@ -61,11 +61,13 @@ tasks.generateWindowsApi {
         "TS_SS_TKBPREDICTIONENABLE",
         "TF_DEFAULT_SELECTION",
         "TF_TF_IGNOREEND",
+        "TF_POPF_ALL",
     )
     enumerations = listOf(
         "TEXT_STORE_LOCK_FLAGS",
         "TsActiveSelEnd",
         "TsRunType",
+        "TsLayoutCode",
     )
 }
 

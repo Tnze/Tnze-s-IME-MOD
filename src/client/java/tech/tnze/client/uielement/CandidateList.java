@@ -1,4 +1,4 @@
-package tech.tnze.client;
+package tech.tnze.client.uielement;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;

@@ -7,6 +7,7 @@ import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
 import org.jspecify.annotations.Nullable;
+import tech.tnze.client.uielement.UIElementSink;
 import tech.tnze.msctf.*;
 import tech.tnze.msctf.windows.win32.system.com.Apis;
 import tech.tnze.msctf.windows.win32.system.com.CLSCTX;
@@ -16,7 +17,6 @@ import tech.tnze.msctf.windows.win32.ui.textservices.*;
 import static java.lang.foreign.ValueLayout.*;
 import static tech.tnze.client.IMEClient.LOGGER;
 import static tech.tnze.msctf.WindowsException.checkResult;
-import static tech.tnze.msctf.windows.win32.foundation.Apis.*;
 import static tech.tnze.msctf.windows.win32.foundation.Constants.E_NOINTERFACE;
 import static tech.tnze.msctf.windows.win32.ui.textservices.Constants.*;
 
@@ -42,7 +42,7 @@ public class Manager {
     private Window window;
     private long hwnd;
     private ITfThreadMgrEx threadManager;
-    private int clientId, editCookie;
+    private int clientId;
     private ITfUIElementMgr uiElementMgr;
 
     public void init(Window window, long hwnd) {
@@ -77,7 +77,7 @@ public class Manager {
             checkResult(uiElementMgr.QueryInterface(ITfSource.iid(), sourceHolder));
             var source = ITfSource.wrap(sourceHolder.get(ITfSource.addressLayout(), 0));
 
-            var sink = new UIElementSink();
+            var sink = new UIElementSink(uiElementMgr);
             var sinkUpcallWrapper = ITfUIElementSink.create(sink, Arena.global()); // TODO: Do we need global?
             sink.setThisPointer(sinkUpcallWrapper);
 
@@ -121,9 +121,9 @@ public class Manager {
     }
 
     private static class Document implements AutoCloseable {
-        private final ITfDocumentMgr documentMgr;
+        private ITfDocumentMgr documentMgr;
         private final MemorySegment documentMgrPtr;
-        private final Context mainContext;
+        private Context mainContext;
 
         Document(ITfThreadMgrEx threadMgr, int clientId, Window window, EditBox editBox) {
             try (var arena = Arena.ofConfined()) {
@@ -134,19 +134,22 @@ public class Manager {
             }
 
             mainContext = new Context(documentMgr, clientId, window, editBox);
-            documentMgr.Push(mainContext.contextPtr);
+            checkResult(documentMgr.Push(mainContext.contextPtr));
         }
 
         @Override
         public void close() {
+            checkResult(documentMgr.Pop(TF_POPF_ALL));
             mainContext.close();
+            mainContext = null;
             documentMgr.Release();
+            documentMgr = null;
         }
     }
 
     private static class Context implements AutoCloseable {
         private Arena arena = Arena.ofConfined();
-        private final ITextStoreACP2 textStoreACP;
+        private ITextStoreACP2 textStoreACP;
         private final MemorySegment contextPtr, textStorePtr;
         private final ITfContext context;
         private final int editCookie;
@@ -198,10 +201,11 @@ public class Manager {
         @Override
         public void close() {
             textStoreACP.Release();
+            textStoreACP = null;
         }
     }
 
-    private HashMap<Screen, HashMap<Object, Document>> documents = new HashMap<>();
+    private final HashMap<Screen, HashMap<Object, Document>> documents = new HashMap<>();
 
     public void onScreenAdded(Screen screen) {
         this.documents.put(screen, new HashMap<>());
@@ -234,131 +238,10 @@ public class Manager {
 
         try (var arena = Arena.ofConfined()) {
             var prevDocumentMgrHolder = arena.allocate(ADDRESS.withTargetLayout(ITfDocumentMgr.addressLayout()));
-            threadManager.AssociateFocus(MemorySegment.ofAddress(hwnd), documentMgr, prevDocumentMgrHolder);
+            checkResult(threadManager.AssociateFocus(MemorySegment.ofAddress(hwnd), documentMgr, prevDocumentMgrHolder));
             var prevDocumentMgr = prevDocumentMgrHolder.get(ITfDocumentMgr.addressLayout(), 0);
             if (prevDocumentMgr.address() != 0) {
                 ITfDocumentMgr.wrap(prevDocumentMgr).Release();
-            }
-        }
-    }
-
-    private class UIElementSink extends ComObject implements ITfUIElementSink {
-        private final static MemorySegment[] implementedIIDs = {IUnknown.iid(), ITfUIElementSink.iid()};
-
-        public UIElementSink() {
-            super(implementedIIDs);
-        }
-
-        @Override
-        public int BeginUIElement(int dwUIElementId, MemorySegment pbShow) {
-            LOGGER.debug("BeginUIElement {}", dwUIElementId);
-            try (var arena = Arena.ofConfined()) {
-                var uiElementHolder = arena.allocate(ADDRESS.withTargetLayout(ITfUIElement.addressLayout()));
-                int result = uiElementMgr.GetUIElement(dwUIElementId, uiElementHolder);
-                if (result < 0) {
-                    LOGGER.error("Failed to get ITfUIElement {}: {}", dwUIElementId, new WindowsException(result));
-                    return result;
-                }
-
-                var uiElement = ITfUIElement.wrap(uiElementHolder.get(ITfUIElement.addressLayout(), 0));
-
-                var candidateListUIElementHolder = arena.allocate(ADDRESS.withTargetLayout(ITfCandidateListUIElement.addressLayout()));
-                result = uiElement.QueryInterface(ITfCandidateListUIElement.iid(), candidateListUIElementHolder);
-                if (result >= 0) {
-                    var candidateListUIElement = ITfCandidateListUIElement.wrap(candidateListUIElementHolder.get(ITfCandidateListUIElement.addressLayout(), 0));
-                    synchronized (uiElements) {
-                        var candidateList = new CandidateList(Minecraft.getInstance());
-                        uiElements.put(dwUIElementId, candidateList);
-                    }
-                    candidateListUIElement.Release();
-                    pbShow.set(JAVA_BOOLEAN, 0, true);
-                } else {
-                    var guidHolder = arena.allocate(tech.tnze.msctf.system.Guid.layout());
-                    checkResult(uiElement.GetGUID(guidHolder));
-                    LOGGER.warn("Unsupported UIElement: {}", Guid.toString(guidHolder));
-                    pbShow.set(JAVA_BOOLEAN, 0, true);
-                }
-
-                uiElement.Release();
-            }
-            return 0;
-        }
-
-        @Override
-        public int UpdateUIElement(int dwUIElementId) {
-            LOGGER.debug("UpdateUIElement {}", dwUIElementId);
-            try (var arena = Arena.ofConfined()) {
-                var uiElementHolder = arena.allocate(ADDRESS.withTargetLayout(ITfUIElement.addressLayout()));
-                int result = uiElementMgr.GetUIElement(dwUIElementId, uiElementHolder);
-                if (result < 0) {
-                    LOGGER.error("Failed to get ITfUIElement {}: {}", dwUIElementId, new WindowsException(result));
-                    return result;
-                }
-
-                var uiElement = ITfUIElement.wrap(uiElementHolder.get(ITfUIElement.addressLayout(), 0));
-
-                var candidateListUIElementHolder = arena.allocate(ADDRESS.withTargetLayout(ITfCandidateListUIElement.addressLayout()));
-                result = uiElement.QueryInterface(ITfCandidateListUIElement.iid(), candidateListUIElementHolder);
-                if (result >= 0) {
-                    var candidateListUIElement = ITfCandidateListUIElement.wrap(candidateListUIElementHolder.get(ITfCandidateListUIElement.addressLayout(), 0));
-                    synchronized (uiElements) {
-                        var candidateList = (CandidateList) uiElements.get(dwUIElementId);
-                        updateCandidateList(candidateListUIElement, candidateList);
-                    }
-                    candidateListUIElement.Release();
-                }
-
-                uiElement.Release();
-            }
-            return 0;
-        }
-
-        @Override
-        public int EndUIElement(int dwUIElementId) {
-            LOGGER.debug("EndUIElement {}", dwUIElementId);
-            synchronized (uiElements) {
-                uiElements.remove(dwUIElementId);
-            }
-            return 0;
-        }
-
-        private void updateCandidateList(ITfCandidateListUIElement elem, CandidateList list) {
-            try (var arena = Arena.ofConfined()) {
-                var countHolder = arena.allocate(JAVA_INT);
-                checkResult(elem.GetCount(countHolder));
-                int count = countHolder.get(JAVA_INT, 0);
-
-                var pageCountHolder = arena.allocate(JAVA_INT);
-                checkResult(elem.GetPageIndex(MemorySegment.NULL, 0, pageCountHolder));
-                int pageCount = pageCountHolder.get(JAVA_INT, 0);
-
-                var pageIndexHolder = arena.allocate(JAVA_INT, pageCount);
-                checkResult(elem.GetPageIndex(pageIndexHolder, pageCount, pageCountHolder));
-                var pageIndex = pageIndexHolder.toArray(JAVA_INT);
-
-                var currentPageHolder = arena.allocate(JAVA_INT);
-                checkResult(elem.GetCurrentPage(currentPageHolder));
-                int currentPage = currentPageHolder.get(JAVA_INT, 0);
-
-                int currentPageStart = pageIndex[currentPage];
-                int currentPageEnd = currentPage + 1 < pageIndex.length ? pageIndex[currentPage + 1] : count;
-
-                var currentPageContents = new String[currentPageEnd - currentPageStart];
-                var candidateWordHolder = arena.allocate(ADDRESS);
-                for (int i = currentPageStart; i < currentPageEnd; i++) {
-                    checkResult(elem.GetString(i, candidateWordHolder));
-                    var candidateWord = candidateWordHolder.get(ADDRESS, 0);
-                    int candidateWordLen = SysStringLen(candidateWord);
-                    var chars = candidateWord.reinterpret(candidateWordLen * JAVA_CHAR.byteSize()).toArray(JAVA_CHAR);
-                    currentPageContents[i - currentPageStart] = String.valueOf(chars);
-                    SysFreeString(candidateWord);
-                }
-
-                var currentSelectionHolder = arena.allocate(JAVA_INT);
-                checkResult(elem.GetSelection(currentSelectionHolder));
-                int currentSelection = currentSelectionHolder.get(JAVA_INT, 0);
-
-                list.setState(count, pageCount, currentPage, currentPageContents, currentSelection - currentPageStart);
             }
         }
     }

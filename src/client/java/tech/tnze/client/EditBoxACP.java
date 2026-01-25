@@ -27,8 +27,8 @@ import static tech.tnze.msctf.windows.win32.ui.textservices.TEXT_STORE_LOCK_FLAG
 import static tech.tnze.msctf.windows.win32.ui.textservices.TEXT_STORE_LOCK_FLAGS.TS_LF_READWRITE;
 
 public abstract class EditBoxACP implements ITextStoreACP2 {
-    private Window window;
-    private EditBox editBox;
+    private final Window window;
+    private final EditBox editBox;
 
     private MemorySegment sinkPtr;
     private ITextStoreACPSink sink;
@@ -74,6 +74,7 @@ public abstract class EditBoxACP implements ITextStoreACP2 {
             }
             sink = ITextStoreACPSink.wrap(sinkHolder.get(ITextStoreACPSink.addressLayout(), 0));
             sinkPtr = punk;
+            editBox.tnze$registerACPSink(sink);
         }
         return 0;
     }
@@ -84,6 +85,7 @@ public abstract class EditBoxACP implements ITextStoreACP2 {
             LOGGER.error("Failed to unadvise sink: {}", punk);
             return CONNECT_E_NOCONNECTION;
         }
+        editBox.tnze$unregisterACPSink(sink);
         sink.Release();
         sinkPtr = null;
         sink = null;
@@ -196,6 +198,7 @@ public abstract class EditBoxACP implements ITextStoreACP2 {
         int end = TS_SELECTION_ACP.acpEnd(pSelection);
         int ase = (int) TS_SELECTION_ACP$style$ase$VH.get(pSelection, 0);
 
+        editBox.tnze$setSinkEnabled(false);
         if (ase == TsActiveSelEnd.TS_AE_START) {
             editBox.setHighlightPos(end);
             editBox.moveCursorTo(start, true);
@@ -203,6 +206,7 @@ public abstract class EditBoxACP implements ITextStoreACP2 {
             editBox.setHighlightPos(start);
             editBox.moveCursorTo(end, true);
         }
+        editBox.tnze$setSinkEnabled(true);
 
         return 0;
     }
@@ -243,13 +247,15 @@ public abstract class EditBoxACP implements ITextStoreACP2 {
             return TS_E_NOLOCK;
         }
 
+        if (acpStart < 0 || acpStart > editBox.value.length() ||  acpEnd < acpStart || acpEnd > editBox.value.length()) {
+            return TS_E_INVALIDPOS;
+        }
+
         var chars = pchText.reinterpret(JAVA_CHAR.byteSize() * cch).toArray(JAVA_CHAR);
         var replacement = String.valueOf(chars);
 
         int newEnd = acpStart + cch;
         editBox.value = editBox.value.substring(0, acpStart) + replacement + editBox.value.substring(acpEnd);
-        editBox.onValueChange(editBox.value);
-
         // Fix selections. TODO: Related to gravity
         {
             int delta = cch - (acpEnd - acpStart);
@@ -273,6 +279,10 @@ public abstract class EditBoxACP implements ITextStoreACP2 {
             editBox.highlightPos = start;
             editBox.cursorPos = end;
         }
+
+        editBox.tnze$setSinkEnabled(false);
+        editBox.onValueChange(editBox.value);
+        editBox.tnze$setSinkEnabled(true);
 
         TS_TEXTCHANGE.acpStart(pChange, acpStart);
         TS_TEXTCHANGE.acpOldEnd(pChange, acpEnd);
@@ -315,7 +325,9 @@ public abstract class EditBoxACP implements ITextStoreACP2 {
 
         int start = Math.min(editBox.cursorPos, editBox.highlightPos);
         int oldEnd = Math.max(editBox.cursorPos, editBox.highlightPos);
+        editBox.tnze$setSinkEnabled(false);
         editBox.insertText(String.valueOf(chars));
+        editBox.tnze$setSinkEnabled(true);
 
         pacpStart.set(JAVA_LONG, 0, Math.min(editBox.cursorPos, editBox.highlightPos));
         pacpEnd.set(JAVA_LONG, 0, Math.max(editBox.cursorPos, editBox.highlightPos));
