@@ -1,0 +1,8 @@
+{
+  "modmenu.nameTranslation.tnze-s-ime-mod": "Tnze的输入法模组",
+  "modmenu.summaryTranslation.tnze-s-ime-mod": "专注于提高 Windows 输入法体验的模组",
+  "modmenu.descriptionTranslation.tnze-s-ime-mod": "专注于提高 Windows 输入法体验的模组。\n本模组的目标是成为你能找到的在 Windows 上最完美的输入法模组。\n\n本模组内部使用的技术极为先进，至少需要 Java 23 以上的运行时环境才能运行。",
+  "tech.tnze.ime.title": "Tnze的输入法模组",
+  "tech.tnze.ime.options.title": "Tnze的输入法模组选项",
+  "tech.tnze.ime.options.uiless_mode": "UILess 模式"
+}

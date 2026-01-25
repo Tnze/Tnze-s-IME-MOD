@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "tnze-s-ime-mod",
   "version": "${version}",
-  "name": "Tnze's IME mod",
+  "name": "Tnze's IME Mod",
   "description": "Tnze's IME support mod for Minecraft",
   "authors": [],
   "contact": {},
@@ -16,6 +16,9 @@
     ],
     "main": [
       "tech.tnze.IME"
+    ],
+    "modmenu": [
+      "tech.tnze.modmenu.ModMenuApiImpl"
     ]
   },
   "mixins": [
