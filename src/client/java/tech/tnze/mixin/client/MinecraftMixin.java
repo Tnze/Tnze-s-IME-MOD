@@ -45,7 +45,6 @@ public abstract class MinecraftMixin {
     @Inject(method = "setScreen(Lnet/minecraft/client/gui/screens/Screen;)V",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/Screen;removed()V"))
     private void tnze$setScreen$removed(CallbackInfo ci) {
-        LOGGER.info("Screen {} removed", this.screen);
         Manager.getInstance().onScreenRemoved(this.screen);
     }
 
@@ -53,7 +52,6 @@ public abstract class MinecraftMixin {
     @Inject(method = "setScreen(Lnet/minecraft/client/gui/screens/Screen;)V",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/Screen;added()V"))
     private void tnze$setScreen$added(CallbackInfo ci) {
-        LOGGER.info("Screen {} added", this.screen);
         Manager.getInstance().onScreenAdded(this.screen);
     }
 

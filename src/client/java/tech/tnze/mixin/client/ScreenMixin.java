@@ -12,7 +12,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import tech.tnze.client.Manager;
-import static tech.tnze.client.IMEClient.LOGGER;
 
 @Mixin(Screen.class)
 public abstract class ScreenMixin extends AbstractContainerEventHandler {
@@ -27,7 +26,6 @@ public abstract class ScreenMixin extends AbstractContainerEventHandler {
     @Override
     public void setFocused(@Nullable GuiEventListener guiEventListener) {
         super.setFocused(guiEventListener);
-        LOGGER.info("{}.setFocused({})", this, guiEventListener);
         Manager.getInstance().onScreenFocusedOnWidget((Screen)(Object) this, guiEventListener);
     }
 }

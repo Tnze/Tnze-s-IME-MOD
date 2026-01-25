@@ -101,7 +101,7 @@ public class Manager {
         }
     }
 
-    public MemorySegment getActiveDocument() {
+    private MemorySegment getActiveDocument() {
         var screen = Minecraft.getInstance().screen;
         if (screen == null) {
             return MemorySegment.NULL;
@@ -118,6 +118,10 @@ public class Manager {
         }
 
         return doc.documentMgrPtr;
+    }
+
+    public int getClientId() {
+        return clientId;
     }
 
     private static class Document implements AutoCloseable {
@@ -209,6 +213,9 @@ public class Manager {
 
     public void onScreenAdded(Screen screen) {
         this.documents.put(screen, new HashMap<>());
+        if (screen.isFocused()) {
+            onScreenFocusedOnWidget(screen, screen.getFocused());
+        }
     }
 
     public void onScreenRemoved(Screen screen) {

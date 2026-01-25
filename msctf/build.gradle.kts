@@ -33,6 +33,7 @@ tasks.generateWindowsApi {
         "ITfCandidateListUIElement",
         "ITextStoreACP2",
         "ITextStoreACPSink",
+        "ITfEditSession",
     )
     constants = listOf(
         "CLSID_TF_ThreadMgr",
