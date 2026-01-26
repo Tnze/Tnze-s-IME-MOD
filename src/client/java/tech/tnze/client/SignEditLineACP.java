@@ -23,14 +23,18 @@ public class SignEditLineACP extends AbstractTextFieldACP {
         this.screen = screen;
     }
 
+    public int getLine() {
+        return line;
+    }
+
     @Override
     protected void adviseACPSink(ITextStoreACPSink sink) {
-        screen.tnze$registerACPSink(sink);
+        screen.tnze$registerACPSink(this, sink);
     }
 
     @Override
     protected void unadviseACPSink(ITextStoreACPSink sink) {
-        screen.tnze$unregisterACPSink(sink);
+        screen.tnze$unregisterACPSink(this, sink);
     }
 
     @Override
@@ -61,18 +65,17 @@ public class SignEditLineACP extends AbstractTextFieldACP {
             return 0;
         }
 
-        if (screen.line != line || screen.signField == null) {
-            pcFetched.set(JAVA_INT, 0, 0);
-            return 0;
-        }
-
         if (ulCount < 1) {
             LOGGER.error("pSelection too small: {}", ulCount);
             return E_FAIL;
         }
 
-        int cursorPos = screen.signField.getCursorPos();
-        int selectionPos = screen.signField.getSelectionPos();
+        int cursorPos = 0, selectionPos = 0;
+        if (screen.signField != null) {
+            cursorPos = screen.signField.getCursorPos();
+            selectionPos = screen.signField.getSelectionPos();
+        }
+
         TS_SELECTION_ACP.acpStart(pSelection, Math.min(cursorPos, selectionPos));
         TS_SELECTION_ACP.acpEnd(pSelection, Math.max(cursorPos, selectionPos));
         TS_SELECTION_ACP$style$ase$VH.set(pSelection, 0, cursorPos > selectionPos ? TsActiveSelEnd.TS_AE_END : TsActiveSelEnd.TS_AE_START);

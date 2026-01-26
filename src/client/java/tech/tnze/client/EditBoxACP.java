@@ -2,29 +2,17 @@ package tech.tnze.client;
 
 import com.mojang.blaze3d.platform.Window;
 import net.minecraft.client.gui.components.EditBox;
-import tech.tnze.msctf.ComObject;
-import tech.tnze.msctf.Guid;
 import tech.tnze.msctf.windows.win32.foundation.POINT;
 import tech.tnze.msctf.windows.win32.foundation.RECT;
-import tech.tnze.msctf.windows.win32.system.com.IUnknown;
 import tech.tnze.msctf.windows.win32.ui.textservices.*;
 
-import java.lang.foreign.Arena;
-import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
-import java.lang.invoke.VarHandle;
 
-import static com.sun.jna.platform.win32.WinError.E_NOTIMPL;
 import static java.lang.foreign.ValueLayout.*;
 import static java.lang.foreign.ValueLayout.JAVA_CHAR;
 import static tech.tnze.client.IMEClient.LOGGER;
-import static tech.tnze.msctf.ComObject.equalIIDs;
 import static tech.tnze.msctf.windows.win32.foundation.Constants.*;
-import static tech.tnze.msctf.windows.win32.system.ole.Constants.CONNECT_E_ADVISELIMIT;
-import static tech.tnze.msctf.windows.win32.system.ole.Constants.CONNECT_E_NOCONNECTION;
 import static tech.tnze.msctf.windows.win32.ui.textservices.Constants.*;
-import static tech.tnze.msctf.windows.win32.ui.textservices.TEXT_STORE_LOCK_FLAGS.TS_LF_READ;
-import static tech.tnze.msctf.windows.win32.ui.textservices.TEXT_STORE_LOCK_FLAGS.TS_LF_READWRITE;
 
 public class EditBoxACP extends AbstractTextFieldACP implements ITextStoreACP2 {
     private final EditBox editBox;
@@ -36,12 +24,12 @@ public class EditBoxACP extends AbstractTextFieldACP implements ITextStoreACP2 {
 
     @Override
     protected void adviseACPSink(ITextStoreACPSink sink) {
-        editBox.tnze$registerACPSink(sink);
+        editBox.tnze$registerACPSink(this, sink);
     }
 
     @Override
     protected void unadviseACPSink(ITextStoreACPSink sink) {
-        editBox.tnze$unregisterACPSink(sink);
+        editBox.tnze$unregisterACPSink(this, sink);
     }
 
     @Override
