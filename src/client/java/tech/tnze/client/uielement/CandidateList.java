@@ -22,6 +22,7 @@ import static java.lang.foreign.ValueLayout.JAVA_INT;
 
 import tech.tnze.client.Manager;
 import tech.tnze.msctf.ComObject;
+import tech.tnze.msctf.WindowsException;
 import tech.tnze.msctf.windows.win32.foundation.RECT;
 import tech.tnze.msctf.windows.win32.system.com.IUnknown;
 import tech.tnze.msctf.windows.win32.ui.textservices.*;
@@ -126,23 +127,25 @@ public class CandidateList implements Renderable {
                         var session = new GetTextExtSession(context, contextView) {
                             @Override
                             public int DoEditSession(int ec) {
-                                var pSelection = this.arena.allocate(TF_SELECTION.layout(), 1);
-                                var pcFetched = this.arena.allocate(JAVA_LONG);
-                                int hr = this.context.GetSelection(ec, TF_DEFAULT_SELECTION, 1, pSelection, pcFetched);
-                                if (hr < 0) return hr;
-
-                                var range = TF_SELECTION.range(pSelection);
                                 try {
-                                    var rectHolder = this.arena.allocate(RECT.layout());
-                                    var clippedHolder = this.arena.allocate(JAVA_BOOLEAN);
-                                    hr = this.contextView.GetTextExt(ec, range, rectHolder, clippedHolder);
-                                    if (hr < 0) return hr;
+                                    var pSelection = this.arena.allocate(TF_SELECTION.layout(), 1);
+                                    var pcFetched = this.arena.allocate(JAVA_LONG);
+                                    checkResult(this.context.GetSelection(ec, TF_DEFAULT_SELECTION, 1, pSelection, pcFetched));
 
-                                    updateAnchor(ScreenRect.fromRect(rectHolder).toGuiRect(minecraft.getWindow()));
-                                } finally {
-                                    ITfRange.wrap(range).Release();
+                                    var range = TF_SELECTION.range(pSelection);
+                                    try {
+                                        var rectHolder = this.arena.allocate(RECT.layout());
+                                        var clippedHolder = this.arena.allocate(JAVA_BOOLEAN);
+                                        checkResult(this.contextView.GetTextExt(ec, range, rectHolder, clippedHolder));
+
+                                        updateAnchor(ScreenRect.fromRect(rectHolder).toGuiRect(minecraft.getWindow()));
+                                    } finally {
+                                        ITfRange.wrap(range).Release();
+                                    }
+                                    return 0;
+                                } catch (WindowsException ex) {
+                                    return ex.getHResult();
                                 }
-                                return 0;
                             }
                         };
 
@@ -170,7 +173,7 @@ public class CandidateList implements Renderable {
         anchorY = rect.getY();
     }
 
-    private record ScreenRect(int left, int top, int right, int bottom ) {
+    private record ScreenRect(int left, int top, int right, int bottom) {
         static ScreenRect fromRect(MemorySegment segment) {
             return new ScreenRect(RECT.left(segment), RECT.top(segment), RECT.right(segment), RECT.bottom(segment));
         }
@@ -206,6 +209,7 @@ public class CandidateList implements Renderable {
         public int QueryInterface(MemorySegment riid, MemorySegment ppvObject) {
             if (ComObject.equalIIDs(riid, IUnknown.iid()) || ComObject.equalIIDs(riid, ITfEditSession.iid())) {
                 ppvObject.set(ADDRESS, 0, pointer);
+                this.AddRef();
                 return 0;
             }
             return E_NOINTERFACE;

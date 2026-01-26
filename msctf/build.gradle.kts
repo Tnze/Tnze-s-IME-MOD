@@ -50,6 +50,7 @@ tasks.generateWindowsApi {
         "TS_E_INVALIDPOS",
         "TS_E_INVALIDPOINT",
         "TS_E_NOLAYOUT",
+        "TS_E_READONLY",
         "TS_S_ASYNC",
         "TS_LF_SYNC",
         "TS_SD_LOADING",

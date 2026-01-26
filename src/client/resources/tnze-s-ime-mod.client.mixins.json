@@ -4,6 +4,7 @@
   "package": "tech.tnze.mixin.client",
   "compatibilityLevel": "JAVA_23",
   "client": [
+    "BookEditScreenMixin",
     "EditBoxMixin",
     "GameRendererMixin",
     "MinecraftMixin",
@@ -14,5 +15,8 @@
   },
   "overwrites": {
     "requireAnnotations": true
-  }
+  },
+  "mixins": [
+    "AbstractSignEditScreenMixin"
+  ]
 }

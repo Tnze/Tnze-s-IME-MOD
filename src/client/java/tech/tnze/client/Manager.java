@@ -6,6 +6,8 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen;
+import net.minecraft.client.gui.screens.inventory.BookEditScreen;
 import org.jspecify.annotations.Nullable;
 import tech.tnze.client.uielement.UIElementSink;
 import tech.tnze.msctf.*;
@@ -23,6 +25,7 @@ import static tech.tnze.msctf.windows.win32.ui.textservices.Constants.*;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.util.*;
+import java.util.function.Function;
 
 public class Manager {
     public static final TreeMap<Integer, Renderable> uiElements = new TreeMap<>();
@@ -90,15 +93,7 @@ public class Manager {
     }
 
     public void onWindowFocusChanged(boolean focused) {
-        try (var arena = Arena.ofConfined()) {
-            var prevDocumentMgrHolder = arena.allocate(ADDRESS.withTargetLayout(ITfDocumentMgr.addressLayout()));
-            threadManager.AssociateFocus(MemorySegment.ofAddress(hwnd), focused ? getActiveDocument() : MemorySegment.NULL, prevDocumentMgrHolder);
-            var prevDocumentMgr = prevDocumentMgrHolder.get(ITfDocumentMgr.addressLayout(), 0);
-            LOGGER.debug("Set focused {}: previous ITfDocumentMgr={}", focused, prevDocumentMgr);
-            if (prevDocumentMgr.address() != 0) {
-                ITfDocumentMgr.wrap(prevDocumentMgr).Release();
-            }
-        }
+        associatedFocus(focused ? getActiveDocument() : MemorySegment.NULL);
     }
 
     private MemorySegment getActiveDocument() {
@@ -107,12 +102,15 @@ public class Manager {
             return MemorySegment.NULL;
         }
 
-        var entry = documents.get(screen);
+        var entry = widgetDocuments.get(screen);
         if (entry == null) {
             return MemorySegment.NULL;
         }
 
-        var doc = entry.get(screen.getFocused());
+        var doc = switch (screen) {
+            case AbstractSignEditScreen signEditScreen -> entry.get(signEditScreen.line);
+            default -> entry.get(screen.getFocused());
+        };
         if (doc == null) {
             return MemorySegment.NULL;
         }
@@ -129,7 +127,7 @@ public class Manager {
         private final MemorySegment documentMgrPtr;
         private Context mainContext;
 
-        Document(ITfThreadMgrEx threadMgr, int clientId, Window window, EditBox editBox) {
+        Document(ITfThreadMgrEx threadMgr, int clientId, MemorySegment textStore) {
             try (var arena = Arena.ofConfined()) {
                 var documentMgrHolder = arena.allocate(ADDRESS.withTargetLayout(ITfDocumentMgr.addressLayout()));
                 checkResult(threadMgr.CreateDocumentMgr(documentMgrHolder));
@@ -137,7 +135,7 @@ public class Manager {
                 documentMgr = ITfDocumentMgr.wrap(documentMgrPtr);
             }
 
-            mainContext = new Context(documentMgr, clientId, window, editBox);
+            mainContext = new Context(documentMgr, clientId, textStore);
             checkResult(documentMgr.Push(mainContext.contextPtr));
         }
 
@@ -152,41 +150,11 @@ public class Manager {
     }
 
     private static class Context implements AutoCloseable {
-        private Arena arena = Arena.ofConfined();
-        private ITextStoreACP2 textStoreACP;
-        private final MemorySegment contextPtr, textStorePtr;
+        private final MemorySegment contextPtr;
         private final ITfContext context;
         private final int editCookie;
 
-        Context(ITfDocumentMgr documentMgr, int clientId, Window window, EditBox editBox) {
-            textStoreACP = new EditBoxACP(window, editBox) {
-                private int refCount = 1;
-
-                @Override
-                public int QueryInterface(MemorySegment riid, MemorySegment ppvObject) {
-                    if (ComObject.equalIIDs(riid, IUnknown.iid()) || ComObject.equalIIDs(riid, ITextStoreACP2.iid())) {
-                        ppvObject.set(ADDRESS, 0, textStorePtr);
-                        return 0;
-                    }
-                    return E_NOINTERFACE;
-                }
-
-                @Override
-                public int AddRef() {
-                    return ++refCount;
-                }
-
-                @Override
-                public int Release() {
-                    if (--refCount == 0) {
-                        arena.close();
-                        arena = null;
-                    }
-                    return refCount;
-                }
-            };
-            textStorePtr = ITextStoreACP2.create(textStoreACP, arena);
-
+        Context(ITfDocumentMgr documentMgr, int clientId, MemorySegment textStorePtr) {
             try (var arena = Arena.ofConfined()) {
                 var contextHolder = arena.allocate(ADDRESS.withTargetLayout(ITfContext.addressLayout()));
                 var editCookieHolder = arena.allocate(JAVA_INT);
@@ -204,55 +172,70 @@ public class Manager {
 
         @Override
         public void close() {
-            textStoreACP.Release();
-            textStoreACP = null;
+            context.Release();
         }
     }
 
-    private final HashMap<Screen, HashMap<Object, Document>> documents = new HashMap<>();
+    private final HashMap<Screen, HashMap<Object, Document>> widgetDocuments = new HashMap<>();
 
     public void onScreenAdded(Screen screen) {
-        this.documents.put(screen, new HashMap<>());
-        onScreenFocusedOnWidget(screen, screen.getFocused());
+        LOGGER.info("onScreenAdded: {}", screen);
+        this.widgetDocuments.put(screen, new HashMap<>());
+        onScreenFocusedChange(screen);
     }
 
     public void onScreenRemoved(Screen screen) {
-        onScreenFocusedOnWidget(screen, null);
-        var contexts = this.documents.remove(screen);
-        if (contexts != null) {
-            contexts.values().forEach(Document::close);
+        LOGGER.info("onScreenRemoved: {}", screen);
+        var documents = widgetDocuments.remove(screen);
+        if (documents != null) {
+            associatedFocus(MemorySegment.NULL);
+            documents.values().forEach(Document::close);
         }
     }
 
-    public synchronized void onScreenFocusedOnWidget(Screen screen, @Nullable GuiEventListener guiEventListener) {
+    public synchronized void onScreenFocusedChange(Screen screen) {
         if (threadManager == null) {
             LOGGER.warn("Not initialized yet");
             return;
         }
 
-        var entry = documents.get(screen);
+        var entry = widgetDocuments.get(screen);
         if (entry == null) {
-            LOGGER.warn("Screen {} is not added, ignoring its focus: {}", screen, guiEventListener);
+            LOGGER.warn("Screen {} is not added, ignoring its focus", screen);
             return;
         }
 
-        MemorySegment documentMgr = MemorySegment.NULL;
-        if (guiEventListener instanceof EditBox editBox) {
-            var document = entry.get(editBox);
-            if (document == null) {
-                LOGGER.info("EditBox focused, creating documentMgr");
-                document = new Document(threadManager, clientId, window, editBox);
-                entry.put(editBox, document);
-            }
-            documentMgr = document.documentMgrPtr;
-        }
+        var documentMgr = switch (screen) {
+            case AbstractSignEditScreen signEditScreen ->
+                    Optional.ofNullable(entry.get(signEditScreen.line)).orElseGet(() -> {
+                        Document document;
+                        try (var signEditTextStore = new SignEditLineACP(window, signEditScreen, signEditScreen.line)) {
+                            document = new Document(threadManager, clientId, signEditTextStore.getPointer());
+                        }
+                        entry.put(signEditScreen.line, document);
+                        return document;
+                    }).documentMgrPtr;
+            default -> switch (screen.getFocused()) {
+                case EditBox editBox -> Optional.ofNullable(entry.get(editBox)).orElseGet(() -> {
+                    Document document;
+                    try (var editBoxTextStore = new EditBoxACP(window, editBox)) {
+                        document = new Document(threadManager, clientId, editBoxTextStore.getPointer());
+                    }
+                    entry.put(editBox, document);
+                    return document;
+                }).documentMgrPtr;
+                case null, default -> MemorySegment.NULL;
+            };
+        };
+        associatedFocus(documentMgr);
+    }
 
-        LOGGER.info("AssociateFocus on {}", documentMgr);
-
+    private void associatedFocus(MemorySegment documentMgrPtr) {
         try (var arena = Arena.ofConfined()) {
             var prevDocumentMgrHolder = arena.allocate(ADDRESS.withTargetLayout(ITfDocumentMgr.addressLayout()));
-            checkResult(threadManager.AssociateFocus(MemorySegment.ofAddress(hwnd), documentMgr, prevDocumentMgrHolder));
+            checkResult(threadManager.AssociateFocus(MemorySegment.ofAddress(hwnd), documentMgrPtr, prevDocumentMgrHolder));
             var prevDocumentMgr = prevDocumentMgrHolder.get(ITfDocumentMgr.addressLayout(), 0);
+            LOGGER.info("AssociatedFocus: {}, previous {}", documentMgrPtr.address(), prevDocumentMgr.address());
             if (prevDocumentMgr.address() != 0) {
                 ITfDocumentMgr.wrap(prevDocumentMgr).Release();
             }

@@ -14,6 +14,6 @@ public abstract class ScreenMixin extends AbstractContainerEventHandler {
     @Override
     public void setFocused(@Nullable GuiEventListener guiEventListener) {
         super.setFocused(guiEventListener);
-        Manager.getInstance().onScreenFocusedOnWidget((Screen)(Object) this, guiEventListener);
+        Manager.getInstance().onScreenFocusedChange((Screen)(Object) this);
     }
 }

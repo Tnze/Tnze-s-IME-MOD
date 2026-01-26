@@ -42,4 +42,8 @@ public class WindowsException extends RuntimeException {
             throw new WindowsException(hr);
         }
     }
+
+    public int getHResult() {
+        return hr;
+    }
 }

@@ -1,52 +1,41 @@
 package tech.tnze.client;
 
 import com.mojang.blaze3d.platform.Window;
-import net.minecraft.client.gui.components.EditBox;
-import tech.tnze.msctf.ComObject;
-import tech.tnze.msctf.Guid;
-import tech.tnze.msctf.windows.win32.foundation.POINT;
-import tech.tnze.msctf.windows.win32.foundation.RECT;
-import tech.tnze.msctf.windows.win32.system.com.IUnknown;
+import net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen;
 import tech.tnze.msctf.windows.win32.ui.textservices.*;
 
-import java.lang.foreign.Arena;
-import java.lang.foreign.MemoryLayout;
 import java.lang.foreign.MemorySegment;
-import java.lang.invoke.VarHandle;
 
-import static com.sun.jna.platform.win32.WinError.E_NOTIMPL;
 import static java.lang.foreign.ValueLayout.*;
-import static java.lang.foreign.ValueLayout.JAVA_CHAR;
+import static java.lang.foreign.ValueLayout.JAVA_LONG;
 import static tech.tnze.client.IMEClient.LOGGER;
-import static tech.tnze.msctf.ComObject.equalIIDs;
-import static tech.tnze.msctf.windows.win32.foundation.Constants.*;
-import static tech.tnze.msctf.windows.win32.system.ole.Constants.CONNECT_E_ADVISELIMIT;
-import static tech.tnze.msctf.windows.win32.system.ole.Constants.CONNECT_E_NOCONNECTION;
+import static tech.tnze.msctf.windows.win32.foundation.Constants.E_FAIL;
 import static tech.tnze.msctf.windows.win32.ui.textservices.Constants.*;
-import static tech.tnze.msctf.windows.win32.ui.textservices.TEXT_STORE_LOCK_FLAGS.TS_LF_READ;
-import static tech.tnze.msctf.windows.win32.ui.textservices.TEXT_STORE_LOCK_FLAGS.TS_LF_READWRITE;
+import static tech.tnze.msctf.windows.win32.ui.textservices.Constants.TF_DEFAULT_SELECTION;
 
-public class EditBoxACP extends AbstractTextFieldACP implements ITextStoreACP2 {
-    private final EditBox editBox;
+public class SignEditLineACP extends AbstractTextFieldACP {
+    private final int line;
+    private final AbstractSignEditScreen screen;
 
-    public EditBoxACP(Window window, EditBox editBox) {
+    public SignEditLineACP(Window window, AbstractSignEditScreen screen, int line) {
         super(window);
-        this.editBox = editBox;
+        this.line = line;
+        this.screen = screen;
     }
 
     @Override
     protected void adviseACPSink(ITextStoreACPSink sink) {
-        editBox.tnze$registerACPSink(sink);
+        screen.tnze$registerACPSink(sink);
     }
 
     @Override
     protected void unadviseACPSink(ITextStoreACPSink sink) {
-        editBox.tnze$unregisterACPSink(sink);
+        screen.tnze$unregisterACPSink(sink);
     }
 
     @Override
     public int GetStatus(MemorySegment pdcs) {
-        TS_STATUS.dwDynamicFlags(pdcs, editBox.isEditable() ? 0 : TS_SD_READONLY);
+        TS_STATUS.dwDynamicFlags(pdcs, screen.line == line && screen.signField != null ? 0 : TS_SD_READONLY);
         TS_STATUS.dwStaticFlags(pdcs, TS_SS_NOHIDDENTEXT);
         return 0;
     }
@@ -72,14 +61,21 @@ public class EditBoxACP extends AbstractTextFieldACP implements ITextStoreACP2 {
             return 0;
         }
 
+        if (screen.line != line || screen.signField == null) {
+            pcFetched.set(JAVA_INT, 0, 0);
+            return 0;
+        }
+
         if (ulCount < 1) {
             LOGGER.error("pSelection too small: {}", ulCount);
             return E_FAIL;
         }
 
-        TS_SELECTION_ACP.acpStart(pSelection, Math.min(editBox.cursorPos, editBox.highlightPos));
-        TS_SELECTION_ACP.acpEnd(pSelection, Math.max(editBox.cursorPos, editBox.highlightPos));
-        TS_SELECTION_ACP$style$ase$VH.set(pSelection, 0, editBox.cursorPos > editBox.highlightPos ? TsActiveSelEnd.TS_AE_END : TsActiveSelEnd.TS_AE_START);
+        int cursorPos = screen.signField.getCursorPos();
+        int selectionPos = screen.signField.getSelectionPos();
+        TS_SELECTION_ACP.acpStart(pSelection, Math.min(cursorPos, selectionPos));
+        TS_SELECTION_ACP.acpEnd(pSelection, Math.max(cursorPos, selectionPos));
+        TS_SELECTION_ACP$style$ase$VH.set(pSelection, 0, cursorPos > selectionPos ? TsActiveSelEnd.TS_AE_END : TsActiveSelEnd.TS_AE_START);
         TS_SELECTION_ACP$style$fInterimChar$VH.set(pSelection, 0, 0);
         pcFetched.set(JAVA_INT, 0, 1);
 
@@ -97,19 +93,24 @@ public class EditBoxACP extends AbstractTextFieldACP implements ITextStoreACP2 {
             return E_FAIL;
         }
 
+        if (screen.line != line || screen.signField == null) {
+            return E_FAIL; // This line is not selected
+        }
+
         int start = TS_SELECTION_ACP.acpStart(pSelection);
         int end = TS_SELECTION_ACP.acpEnd(pSelection);
         int ase = (int) TS_SELECTION_ACP$style$ase$VH.get(pSelection, 0);
 
-        editBox.tnze$setSinkEnabled(false);
+
+        screen.tnze$setSinkEnabled(false);
         if (ase == TsActiveSelEnd.TS_AE_START) {
-            editBox.setHighlightPos(end);
-            editBox.moveCursorTo(start, true);
+            screen.signField.setSelectionPos(end);
+            screen.signField.setCursorPos(start);
         } else { // End or None
-            editBox.setHighlightPos(start);
-            editBox.moveCursorTo(end, true);
+            screen.signField.setSelectionPos(start);
+            screen.signField.setCursorPos(end);
         }
-        editBox.tnze$setSinkEnabled(true);
+        screen.tnze$setSinkEnabled(true);
 
         return 0;
     }
@@ -120,7 +121,7 @@ public class EditBoxACP extends AbstractTextFieldACP implements ITextStoreACP2 {
             return TS_E_NOLOCK;
         }
 
-        String value = editBox.getValue();
+        String value = screen.messages[line];
         if (acpEnd == -1) {
             acpEnd = value.length();
         }
@@ -150,7 +151,12 @@ public class EditBoxACP extends AbstractTextFieldACP implements ITextStoreACP2 {
             return TS_E_NOLOCK;
         }
 
-        if (acpStart < 0 || acpStart > editBox.value.length() || acpEnd < acpStart || acpEnd > editBox.value.length()) {
+        if (screen.line != line || screen.signField == null) {
+            return TS_E_READONLY; // This line is not selected
+        }
+
+        String value = screen.messages[line];
+        if (acpStart < 0 || acpStart > value.length() || acpEnd < acpStart || acpEnd > value.length()) {
             return TS_E_INVALIDPOS;
         }
 
@@ -158,12 +164,14 @@ public class EditBoxACP extends AbstractTextFieldACP implements ITextStoreACP2 {
         var replacement = String.valueOf(chars);
 
         int newEnd = acpStart + cch;
-        editBox.value = editBox.value.substring(0, acpStart) + replacement + editBox.value.substring(acpEnd);
+        value = value.substring(0, acpStart) + replacement + value.substring(acpEnd);
         // Fix selections. TODO: Related to gravity
         {
             int delta = cch - (acpEnd - acpStart);
-            int start = Math.min(editBox.cursorPos, editBox.highlightPos);
-            int end = Math.max(editBox.cursorPos, editBox.highlightPos);
+            int cursorPos = screen.signField.getCursorPos();
+            int selectionPos = screen.signField.getSelectionPos();
+            int start = Math.min(cursorPos, selectionPos);
+            int end = Math.max(cursorPos, selectionPos);
             if (end < acpStart) {
                 // Do nothing
             } else if (start < acpStart && end < acpEnd) {
@@ -179,13 +187,13 @@ public class EditBoxACP extends AbstractTextFieldACP implements ITextStoreACP2 {
                 start += delta;
                 end += delta;
             }
-            editBox.highlightPos = start;
-            editBox.cursorPos = end;
+            screen.signField.setSelectionPos(start);
+            screen.signField.setCursorPos(end);
         }
 
-        editBox.tnze$setSinkEnabled(false);
-        editBox.onValueChange(editBox.value);
-        editBox.tnze$setSinkEnabled(true);
+        screen.tnze$setSinkEnabled(false);
+        screen.setMessage(value);
+        screen.tnze$setSinkEnabled(true);
 
         TS_TEXTCHANGE.acpStart(pChange, acpStart);
         TS_TEXTCHANGE.acpOldEnd(pChange, acpEnd);
@@ -199,27 +207,35 @@ public class EditBoxACP extends AbstractTextFieldACP implements ITextStoreACP2 {
             return TS_E_NOLOCK;
         }
 
+        if (screen.line != line || screen.signField == null) {
+            return TS_E_READONLY; // This line is not selected
+        }
+
         var chars = pchText.reinterpret(JAVA_CHAR.byteSize() * cch).toArray(JAVA_CHAR);
 
-        int start = Math.min(editBox.cursorPos, editBox.highlightPos);
-        int oldEnd = Math.max(editBox.cursorPos, editBox.highlightPos);
-        editBox.tnze$setSinkEnabled(false);
-        editBox.insertText(String.valueOf(chars));
-        editBox.tnze$setSinkEnabled(true);
+        int cursorPos = screen.signField.getCursorPos();
+        int selectionPos = screen.signField.getSelectionPos();
+        int start = Math.min(cursorPos, selectionPos);
+        int oldEnd = Math.max(cursorPos, selectionPos);
 
-        pacpStart.set(JAVA_LONG, 0, Math.min(editBox.cursorPos, editBox.highlightPos));
-        pacpEnd.set(JAVA_LONG, 0, Math.max(editBox.cursorPos, editBox.highlightPos));
+        screen.tnze$setSinkEnabled(false);
+        screen.signField.insertText(String.valueOf(chars));
+        screen.tnze$setSinkEnabled(true);
+
+        cursorPos = screen.signField.getCursorPos();
+        selectionPos = screen.signField.getSelectionPos();
+        pacpStart.set(JAVA_LONG, 0, Math.min(cursorPos, selectionPos));
+        pacpEnd.set(JAVA_LONG, 0, Math.max(cursorPos, selectionPos));
 
         TS_TEXTCHANGE.acpStart(pChange, start);
         TS_TEXTCHANGE.acpOldEnd(pChange, oldEnd);
-        TS_TEXTCHANGE.acpNewEnd(pChange, Math.max(editBox.cursorPos, editBox.highlightPos));
-
+        TS_TEXTCHANGE.acpNewEnd(pChange, Math.max(cursorPos, selectionPos));
         return 0;
     }
 
     @Override
     public int FindNextAttrTransition(int acpStart, int acpHalt, int cFilterAttrs, MemorySegment paFilterAttrs, int dwFlags, MemorySegment pacpNext, MemorySegment pfFound, MemorySegment plFoundOffset) {
-        pacpNext.set(JAVA_LONG, 0, editBox.value.length());
+        pacpNext.set(JAVA_LONG, 0, screen.messages[line].length());
         pfFound.set(JAVA_BOOLEAN, 0, false);
         return 0;
     }
@@ -230,62 +246,17 @@ public class EditBoxACP extends AbstractTextFieldACP implements ITextStoreACP2 {
             return TS_E_NOLOCK;
         }
 
-        pacp.set(JAVA_LONG, 0, editBox.value.length());
+        pacp.set(JAVA_LONG, 0, screen.messages[line].length());
         return 0;
     }
 
     @Override
     public int GetACPFromPoint(int vcView, MemorySegment ptScreen, int dwFlags, MemorySegment pacp) {
-        int windowX = (POINT.x(ptScreen) - window.getX()) / window.getGuiScale();
-        int windowY = (POINT.y(ptScreen) - window.getY()) / window.getGuiScale();
-
-        int widgetX = windowX - editBox.textX;
-        int widgetY = windowY - editBox.textY;
-
-        if (widgetX < 0 || widgetX >= editBox.getInnerWidth() || widgetY < 0 || widgetY >= editBox.font.lineHeight) {
-            return TS_E_INVALIDPOINT;
-        }
-
-        String displayValue = editBox.value.substring(editBox.displayPos);
-        int i = editBox.displayPos + editBox.font.plainSubstrByWidth(displayValue, widgetX).length();
-
-        pacp.set(JAVA_LONG, 0, i);
         return 0;
     }
 
     @Override
     public int GetTextExt(int vcView, int acpStart, int acpEnd, MemorySegment prc, MemorySegment pfClipped) {
-        if (currentLockState.ordinal() < LockState.ReadOnly.ordinal()) {
-            return TS_E_NOLOCK;
-        }
-
-        if (acpStart < 0 || acpStart > editBox.value.length() || acpEnd < acpStart || acpEnd > editBox.value.length()) {
-            return TS_E_INVALIDPOS;
-        }
-
-        boolean clipped = false;
-        if (acpStart < editBox.displayPos) {
-            acpStart = editBox.displayPos;
-            clipped = true;
-        }
-        if (acpEnd < editBox.displayPos) {
-            acpEnd = editBox.displayPos;
-        }
-        int startOffset = editBox.font.width(editBox.value.substring(editBox.displayPos, acpStart));
-        int endOffset = editBox.font.width(editBox.value.substring(editBox.displayPos, acpEnd));
-        if (endOffset > editBox.getInnerWidth()) {
-            endOffset = editBox.getInnerWidth();
-            clipped = true;
-        }
-
-        RECT.top(prc, window.getY() + editBox.textY * window.getGuiScale());
-        RECT.left(prc, window.getX() + (editBox.textX + startOffset) * window.getGuiScale());
-        RECT.right(prc, window.getX() + (editBox.textX + endOffset) * window.getGuiScale());
-        RECT.bottom(prc, window.getY() + (editBox.textY + editBox.font.lineHeight) * window.getGuiScale());
-
-        pfClipped.set(JAVA_BOOLEAN, 0, clipped);
-
         return 0;
     }
-
 }

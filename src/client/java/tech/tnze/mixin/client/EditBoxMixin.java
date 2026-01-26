@@ -85,7 +85,6 @@ public abstract class EditBoxMixin implements ACPSinkRegister {
             }
         }
     }
-    // TODO: insertText
 
     @Inject(method = "setCursorPosition", at = @At("TAIL"))
     public void tnze$setCursorPosition(int i, CallbackInfo ci) {
