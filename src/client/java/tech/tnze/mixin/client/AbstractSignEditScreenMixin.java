@@ -40,7 +40,7 @@ public class AbstractSignEditScreenMixin implements ACPSinkRegister {
 
     @Inject(method = "keyPressed", at = @At("RETURN"))
     public void tnze$keyPressed(KeyEvent keyEvent, CallbackInfoReturnable<Boolean> cir) {
-        if (keyEvent.isUp() || keyEvent.isDown()) {
+        if (keyEvent.isUp() || keyEvent.isDown() || keyEvent.isConfirmation()) {
             LOGGER.info("SignEditScreen line shifted to {}", this.line);
             Manager.getInstance().onScreenFocusedChange((AbstractSignEditScreen) (Object) this);
         } else if (sinkEnabled) {
