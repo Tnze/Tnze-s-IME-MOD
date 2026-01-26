@@ -2,6 +2,7 @@ package tech.tnze.client;
 
 import com.mojang.blaze3d.platform.Window;
 import net.minecraft.client.gui.screens.inventory.AbstractSignEditScreen;
+import tech.tnze.msctf.windows.win32.foundation.RECT;
 import tech.tnze.msctf.windows.win32.ui.textservices.*;
 
 import java.lang.foreign.MemorySegment;
@@ -255,11 +256,39 @@ public class SignEditLineACP extends AbstractTextFieldACP {
 
     @Override
     public int GetACPFromPoint(int vcView, MemorySegment ptScreen, int dwFlags, MemorySegment pacp) {
+        pacp.set(JAVA_LONG, 0, 0);
         return 0;
     }
 
     @Override
     public int GetTextExt(int vcView, int acpStart, int acpEnd, MemorySegment prc, MemorySegment pfClipped) {
+        float ox = screen.width / 2.0F, oy = screen.getSignYOffset();
+        var scale = screen.getSignTextScale();
+        int lineHeight = screen.sign.getTextLineHeight();
+        var font = screen.getFont();
+
+        String value = screen.messages[line];
+        if (acpStart < 0 || acpStart > value.length() || acpEnd < acpStart || acpEnd > value.length()) {
+            return TS_E_INVALIDPOS;
+        }
+
+        int startOffset = font.width(value.substring(0, acpStart));
+        int endOffset = font.width(value.substring(0, acpEnd));
+
+        int textX = -font.width(value) / 2;
+        int textY = (line - 2) * lineHeight;
+
+        textX = (int) (textX * scale.x + ox);
+        textY = (int) (textY * scale.y + oy);
+        startOffset = (int) (startOffset * scale.x);
+        endOffset = (int) (endOffset * scale.y);
+        lineHeight = (int) (lineHeight * scale.y);
+
+        RECT.top(prc, window.getY() + textY * window.getGuiScale());
+        RECT.left(prc, window.getX() + (textX + startOffset) * window.getGuiScale());
+        RECT.right(prc, window.getX() + (textX + endOffset) * window.getGuiScale());
+        RECT.bottom(prc, window.getY() + (textY + lineHeight) * window.getGuiScale());
+        pfClipped.set(JAVA_BOOLEAN, 0, false);
         return 0;
     }
 }

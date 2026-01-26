@@ -1,16 +1,19 @@
 accessWidener v2 named
 
-accessible method   net/minecraft/client/gui/components/EditBox                         isEditable      ()Z
-accessible method   net/minecraft/client/gui/components/EditBox                         onValueChange   (Ljava/lang/String;)V
-accessible field    net/minecraft/client/gui/components/EditBox                         highlightPos    I
-accessible field    net/minecraft/client/gui/components/EditBox                         cursorPos       I
-accessible field    net/minecraft/client/gui/components/EditBox                         textX           I
-accessible field    net/minecraft/client/gui/components/EditBox                         textY           I
-accessible field    net/minecraft/client/gui/components/EditBox                         displayPos      I
-accessible field    net/minecraft/client/gui/components/EditBox                         value           Ljava/lang/String;
-accessible field    net/minecraft/client/gui/components/EditBox                         font            Lnet/minecraft/client/gui/Font;
+accessible method   net/minecraft/client/gui/components/EditBox     isEditable      ()Z
+accessible method   net/minecraft/client/gui/components/EditBox     onValueChange   (Ljava/lang/String;)V
+accessible field    net/minecraft/client/gui/components/EditBox     highlightPos    I
+accessible field    net/minecraft/client/gui/components/EditBox     cursorPos       I
+accessible field    net/minecraft/client/gui/components/EditBox     textX           I
+accessible field    net/minecraft/client/gui/components/EditBox     textY           I
+accessible field    net/minecraft/client/gui/components/EditBox     displayPos      I
+accessible field    net/minecraft/client/gui/components/EditBox     value           Ljava/lang/String;
+accessible field    net/minecraft/client/gui/components/EditBox     font            Lnet/minecraft/client/gui/Font;
 
-accessible method   net/minecraft/client/gui/screens/inventory/AbstractSignEditScreen   setMessage      (Ljava/lang/String;)V
-accessible field    net/minecraft/client/gui/screens/inventory/AbstractSignEditScreen   line            I
-accessible field    net/minecraft/client/gui/screens/inventory/AbstractSignEditScreen   signField       Lnet/minecraft/client/gui/font/TextFieldHelper;
-accessible field    net/minecraft/client/gui/screens/inventory/AbstractSignEditScreen   messages        [Ljava/lang/String;
+accessible method   net/minecraft/client/gui/screens/inventory/AbstractSignEditScreen   setMessage          (Ljava/lang/String;)V
+accessible method   net/minecraft/client/gui/screens/inventory/AbstractSignEditScreen   getSignYOffset      ()F
+accessible method   net/minecraft/client/gui/screens/inventory/AbstractSignEditScreen   getSignTextScale    ()Lorg/joml/Vector3f;
+accessible field    net/minecraft/client/gui/screens/inventory/AbstractSignEditScreen   line                I
+accessible field    net/minecraft/client/gui/screens/inventory/AbstractSignEditScreen   signField           Lnet/minecraft/client/gui/font/TextFieldHelper;
+accessible field    net/minecraft/client/gui/screens/inventory/AbstractSignEditScreen   messages            [Ljava/lang/String;
+accessible field    net/minecraft/client/gui/screens/inventory/AbstractSignEditScreen   sign                Lnet/minecraft/world/level/block/entity/SignBlockEntity;
