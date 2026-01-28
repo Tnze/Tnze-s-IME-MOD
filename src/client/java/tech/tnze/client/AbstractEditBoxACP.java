@@ -23,7 +23,7 @@ import static tech.tnze.msctf.windows.win32.ui.textservices.Constants.*;
 import static tech.tnze.msctf.windows.win32.ui.textservices.TEXT_STORE_LOCK_FLAGS.TS_LF_READ;
 import static tech.tnze.msctf.windows.win32.ui.textservices.TEXT_STORE_LOCK_FLAGS.TS_LF_READWRITE;
 
-public abstract class AbstractTextFieldACP implements ITextStoreACP2, AutoCloseable {
+public abstract class AbstractEditBoxACP implements ITextStoreACP2, AutoCloseable {
     private Arena arena = Arena.ofShared();
     protected final Window window;
     private int refCount = 1;
@@ -50,7 +50,7 @@ public abstract class AbstractTextFieldACP implements ITextStoreACP2, AutoClosea
         }
     }
 
-    public AbstractTextFieldACP(Window window) {
+    public AbstractEditBoxACP(Window window) {
         this.window = window;
         textStorePtr = ITextStoreACP2.create(this, arena);
     }

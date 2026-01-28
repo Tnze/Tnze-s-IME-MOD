@@ -14,7 +14,7 @@ import static tech.tnze.msctf.windows.win32.foundation.Constants.E_FAIL;
 import static tech.tnze.msctf.windows.win32.ui.textservices.Constants.*;
 import static tech.tnze.msctf.windows.win32.ui.textservices.Constants.TF_DEFAULT_SELECTION;
 
-public class SignEditLineACP extends AbstractTextFieldACP {
+public class SignEditLineACP extends AbstractEditBoxACP {
     private final int line;
     private final AbstractSignEditScreen screen;
 

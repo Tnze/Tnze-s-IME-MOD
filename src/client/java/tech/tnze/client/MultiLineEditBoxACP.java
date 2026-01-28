@@ -1,7 +1,8 @@
 package tech.tnze.client;
 
 import com.mojang.blaze3d.platform.Window;
-import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.MultiLineEditBox;
+import net.minecraft.util.Mth;
 import tech.tnze.msctf.windows.win32.foundation.POINT;
 import tech.tnze.msctf.windows.win32.foundation.RECT;
 import tech.tnze.msctf.windows.win32.ui.textservices.*;
@@ -9,32 +10,33 @@ import tech.tnze.msctf.windows.win32.ui.textservices.*;
 import java.lang.foreign.MemorySegment;
 
 import static java.lang.foreign.ValueLayout.*;
-import static java.lang.foreign.ValueLayout.JAVA_CHAR;
+import static java.lang.foreign.ValueLayout.JAVA_BOOLEAN;
+import static java.lang.foreign.ValueLayout.JAVA_LONG;
 import static tech.tnze.client.IMEClient.LOGGER;
-import static tech.tnze.msctf.windows.win32.foundation.Constants.*;
+import static tech.tnze.msctf.windows.win32.foundation.Constants.E_FAIL;
 import static tech.tnze.msctf.windows.win32.ui.textservices.Constants.*;
 
-public class EditBoxACP extends AbstractEditBoxACP implements ITextStoreACP2 {
-    private final EditBox editBox;
+public class MultiLineEditBoxACP extends AbstractEditBoxACP {
+    private final MultiLineEditBox editBox;
 
-    public EditBoxACP(Window window, EditBox editBox) {
+    public MultiLineEditBoxACP(Window window, MultiLineEditBox editBox) {
         super(window);
         this.editBox = editBox;
     }
 
     @Override
     protected void adviseACPSink(ITextStoreACPSink sink) {
-        editBox.tnze$registerACPSink(this, sink);
+
     }
 
     @Override
     protected void unadviseACPSink(ITextStoreACPSink sink) {
-        editBox.tnze$unregisterACPSink(this, sink);
+
     }
 
     @Override
     public int GetStatus(MemorySegment pdcs) {
-        TS_STATUS.dwDynamicFlags(pdcs, editBox.isEditable() ? 0 : TS_SD_READONLY);
+        TS_STATUS.dwDynamicFlags(pdcs, 0);
         TS_STATUS.dwStaticFlags(pdcs, TS_SS_NOHIDDENTEXT);
         return 0;
     }
@@ -65,9 +67,11 @@ public class EditBoxACP extends AbstractEditBoxACP implements ITextStoreACP2 {
             return E_FAIL;
         }
 
-        TS_SELECTION_ACP.acpStart(pSelection, Math.min(editBox.cursorPos, editBox.highlightPos));
-        TS_SELECTION_ACP.acpEnd(pSelection, Math.max(editBox.cursorPos, editBox.highlightPos));
-        TS_SELECTION_ACP$style$ase$VH.set(pSelection, 0, editBox.cursorPos > editBox.highlightPos ? TsActiveSelEnd.TS_AE_END : TsActiveSelEnd.TS_AE_START);
+        var selected = editBox.textField.getSelected();
+
+        TS_SELECTION_ACP.acpStart(pSelection, selected.beginIndex);
+        TS_SELECTION_ACP.acpEnd(pSelection, selected.endIndex);
+        TS_SELECTION_ACP$style$ase$VH.set(pSelection, 0, editBox.textField.cursor > editBox.textField.selectCursor ? TsActiveSelEnd.TS_AE_END : TsActiveSelEnd.TS_AE_START);
         TS_SELECTION_ACP$style$fInterimChar$VH.set(pSelection, 0, 0);
         pcFetched.set(JAVA_INT, 0, 1);
 
@@ -91,11 +95,11 @@ public class EditBoxACP extends AbstractEditBoxACP implements ITextStoreACP2 {
 
         editBox.tnze$setSinkEnabled(false);
         if (ase == TsActiveSelEnd.TS_AE_START) {
-            editBox.setHighlightPos(end);
-            editBox.moveCursorTo(start, true);
+            editBox.textField.cursor = start;
+            editBox.textField.selectCursor = end;
         } else { // End or None
-            editBox.setHighlightPos(start);
-            editBox.moveCursorTo(end, true);
+            editBox.textField.cursor = end;
+            editBox.textField.selectCursor = start;
         }
         editBox.tnze$setSinkEnabled(true);
 
@@ -138,7 +142,8 @@ public class EditBoxACP extends AbstractEditBoxACP implements ITextStoreACP2 {
             return TS_E_NOLOCK;
         }
 
-        if (acpStart < 0 || acpStart > editBox.value.length() || acpEnd < acpStart || acpEnd > editBox.value.length()) {
+        var value = editBox.getValue();
+        if (acpStart < 0 || acpStart > value.length() || acpEnd < acpStart || acpEnd > value.length()) {
             return TS_E_INVALIDPOS;
         }
 
@@ -146,12 +151,13 @@ public class EditBoxACP extends AbstractEditBoxACP implements ITextStoreACP2 {
         var replacement = String.valueOf(chars);
 
         int newEnd = acpStart + cch;
-        editBox.value = editBox.value.substring(0, acpStart) + replacement + editBox.value.substring(acpEnd);
+        var selected = editBox.textField.getSelected();
+        editBox.setValue(value.substring(0, acpStart) + replacement + value.substring(acpEnd));
         // Fix selections. TODO: Related to gravity
         {
             int delta = cch - (acpEnd - acpStart);
-            int start = Math.min(editBox.cursorPos, editBox.highlightPos);
-            int end = Math.max(editBox.cursorPos, editBox.highlightPos);
+            int start = selected.beginIndex;
+            int end = selected.endIndex;
             if (end < acpStart) {
                 // Do nothing
             } else if (start < acpStart && end < acpEnd) {
@@ -167,12 +173,12 @@ public class EditBoxACP extends AbstractEditBoxACP implements ITextStoreACP2 {
                 start += delta;
                 end += delta;
             }
-            editBox.highlightPos = start;
-            editBox.cursorPos = end;
+            editBox.textField.selectCursor = start;
+            editBox.textField.cursor = end;
         }
 
         editBox.tnze$setSinkEnabled(false);
-        editBox.onValueChange(editBox.value);
+        editBox.textField.onValueChange();
         editBox.tnze$setSinkEnabled(true);
 
         TS_TEXTCHANGE.acpStart(pChange, acpStart);
@@ -189,25 +195,27 @@ public class EditBoxACP extends AbstractEditBoxACP implements ITextStoreACP2 {
 
         var chars = pchText.reinterpret(JAVA_CHAR.byteSize() * cch).toArray(JAVA_CHAR);
 
-        int start = Math.min(editBox.cursorPos, editBox.highlightPos);
-        int oldEnd = Math.max(editBox.cursorPos, editBox.highlightPos);
+        var selected = editBox.textField.getSelected();
+        int start = selected.beginIndex;
+        int oldEnd = selected.endIndex;
         editBox.tnze$setSinkEnabled(false);
-        editBox.insertText(String.valueOf(chars));
+        editBox.textField.insertText(String.valueOf(chars));
         editBox.tnze$setSinkEnabled(true);
 
-        pacpStart.set(JAVA_LONG, 0, Math.min(editBox.cursorPos, editBox.highlightPos));
-        pacpEnd.set(JAVA_LONG, 0, Math.max(editBox.cursorPos, editBox.highlightPos));
+        selected = editBox.textField.getSelected();
+        pacpStart.set(JAVA_LONG, 0, selected.beginIndex);
+        pacpEnd.set(JAVA_LONG, 0, selected.endIndex);
 
         TS_TEXTCHANGE.acpStart(pChange, start);
         TS_TEXTCHANGE.acpOldEnd(pChange, oldEnd);
-        TS_TEXTCHANGE.acpNewEnd(pChange, Math.max(editBox.cursorPos, editBox.highlightPos));
+        TS_TEXTCHANGE.acpNewEnd(pChange, selected.endIndex);
 
         return 0;
     }
 
     @Override
     public int FindNextAttrTransition(int acpStart, int acpHalt, int cFilterAttrs, MemorySegment paFilterAttrs, int dwFlags, MemorySegment pacpNext, MemorySegment pfFound, MemorySegment plFoundOffset) {
-        pacpNext.set(JAVA_LONG, 0, editBox.value.length());
+        pacpNext.set(JAVA_LONG, 0, editBox.getValue().length());
         pfFound.set(JAVA_BOOLEAN, 0, false);
         return 0;
     }
@@ -218,7 +226,7 @@ public class EditBoxACP extends AbstractEditBoxACP implements ITextStoreACP2 {
             return TS_E_NOLOCK;
         }
 
-        pacp.set(JAVA_LONG, 0, editBox.value.length());
+        pacp.set(JAVA_LONG, 0, editBox.getValue().length());
         return 0;
     }
 
@@ -227,15 +235,22 @@ public class EditBoxACP extends AbstractEditBoxACP implements ITextStoreACP2 {
         int windowX = (POINT.x(ptScreen) - window.getX()) / window.getGuiScale();
         int windowY = (POINT.y(ptScreen) - window.getY()) / window.getGuiScale();
 
-        int widgetX = windowX - editBox.textX;
-        int widgetY = windowY - editBox.textY;
+        double widgetX = windowX - (editBox.getX() + editBox.innerPadding());
+        double widgetY = windowY - (editBox.getY() + editBox.innerPadding() - editBox.scrollAmount());
 
-        if (widgetX < 0 || widgetX >= editBox.getInnerWidth() || widgetY < 0 || widgetY >= editBox.font.lineHeight) {
+        int line = Mth.floor(widgetY / 9.0);
+        if (line < 0 || line >= editBox.textField.displayLines.size()) {
             return TS_E_INVALIDPOINT;
         }
 
-        String displayValue = editBox.value.substring(editBox.displayPos);
-        int i = editBox.displayPos + editBox.font.plainSubstrByWidth(displayValue, widgetX).length();
+        var lineView = editBox.textField.displayLines.get(line);
+        var lineText = editBox.textField.value().substring(lineView.beginIndex, lineView.endIndex);
+
+        var lineWidth = editBox.textField.font.width(lineText);
+        if (widgetX < 0 || widgetX > lineWidth) {
+            return TS_E_INVALIDPOINT;
+        }
+        int i = editBox.textField.font.plainSubstrByWidth(lineText, Mth.floor(widgetX)).length();
 
         pacp.set(JAVA_LONG, 0, i);
         return 0;
@@ -247,31 +262,49 @@ public class EditBoxACP extends AbstractEditBoxACP implements ITextStoreACP2 {
             return TS_E_NOLOCK;
         }
 
-        if (acpStart < 0 || acpStart > editBox.value.length() || acpEnd < acpStart || acpEnd > editBox.value.length()) {
+        var value = editBox.getValue();
+        var length = value.length();
+        if (acpStart < 0 || acpEnd < acpStart || acpEnd > length) {
             return TS_E_INVALIDPOS;
         }
 
-        boolean clipped = false;
-        if (acpStart < editBox.displayPos) {
-            acpStart = editBox.displayPos;
-            clipped = true;
-        }
-        if (acpEnd < editBox.displayPos) {
-            acpEnd = editBox.displayPos;
-        }
-        int startOffset = editBox.font.width(editBox.value.substring(editBox.displayPos, acpStart));
-        int endOffset = editBox.font.width(editBox.value.substring(editBox.displayPos, acpEnd));
-        if (endOffset > editBox.getInnerWidth()) {
-            endOffset = editBox.getInnerWidth();
-            clipped = true;
+        int lineStart = editBox.textField.displayLines.size(), lineEnd = -1;
+        double offsetX = editBox.getWidth();
+        double offsetY = 0;
+        int width = 0;
+        int height = 0;
+
+        for (int i = 0; i < editBox.textField.displayLines.size(); i++) {
+            var lineView = editBox.textField.displayLines.get(i);
+            var lineText = editBox.textField.value().substring(lineView.beginIndex, lineView.endIndex);
+            var lineWidth = editBox.textField.font.width(lineText);
+
+            if (lineView.beginIndex <= acpStart && lineView.endIndex >= acpStart) {
+                lineStart = i;
+                offsetX = editBox.textField.font.width(lineText.substring(0, acpStart - lineView.beginIndex));
+                offsetY = 9 * i;
+            }
+            if (i > lineStart) {
+                width = Math.max(width, lineWidth);
+                offsetX = Math.min(offsetX, 0);
+            }
+            if (lineView.beginIndex <= acpEnd && lineView.endIndex >= acpEnd) {
+                lineEnd = i;
+                width = Math.max(width, editBox.textField.font.width(lineText.substring(0, acpEnd - lineView.beginIndex)));
+                break;
+            }
+
         }
 
-        RECT.top(prc, window.getY() + editBox.textY * window.getGuiScale());
-        RECT.left(prc, window.getX() + (editBox.textX + startOffset) * window.getGuiScale());
-        RECT.right(prc, window.getX() + (editBox.textX + endOffset) * window.getGuiScale());
-        RECT.bottom(prc, window.getY() + (editBox.textY + editBox.font.lineHeight) * window.getGuiScale());
+        offsetX += editBox.getX() + editBox.innerPadding();
+        offsetY += editBox.getY() + editBox.innerPadding() - editBox.scrollAmount();
 
-        pfClipped.set(JAVA_BOOLEAN, 0, clipped);
+        RECT.top(prc, (int) (window.getY() + offsetY * window.getGuiScale()));
+        RECT.left(prc, (int) (window.getX() + offsetX * window.getGuiScale()));
+        RECT.right(prc, (int) (window.getX() + (offsetX + width) * window.getGuiScale()));
+        RECT.bottom(prc, (int) (window.getY() + (offsetY + height) * window.getGuiScale()));
+
+        pfClipped.set(JAVA_BOOLEAN, 0, false);
 
         return 0;
     }

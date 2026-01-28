@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import tech.tnze.client.ACPSinkRegister;
-import tech.tnze.client.AbstractTextFieldACP;
+import tech.tnze.client.AbstractEditBoxACP;
 import tech.tnze.client.Manager;
 import tech.tnze.client.SignEditLineACP;
 import tech.tnze.msctf.windows.win32.ui.textservices.ITextStoreACPSink;
@@ -106,13 +106,13 @@ public class AbstractSignEditScreenMixin implements ACPSinkRegister {
     private boolean sinkEnabled = true;
 
     @Override
-    public void tnze$registerACPSink(AbstractTextFieldACP acpImpl, ITextStoreACPSink sink) {
+    public void tnze$registerACPSink(AbstractEditBoxACP acpImpl, ITextStoreACPSink sink) {
         int line = ((SignEditLineACP) acpImpl).getLine();
         textStoreSink[line] = sink;
     }
 
     @Override
-    public void tnze$unregisterACPSink(AbstractTextFieldACP acpImpl, ITextStoreACPSink sink) {
+    public void tnze$unregisterACPSink(AbstractEditBoxACP acpImpl, ITextStoreACPSink sink) {
         int line = ((SignEditLineACP) acpImpl).getLine();
         assert sink.equals(textStoreSink[line]);
         textStoreSink[line] = null;

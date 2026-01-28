@@ -3,6 +3,7 @@ package tech.tnze.client;
 import com.mojang.blaze3d.platform.Window;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
@@ -219,6 +220,14 @@ public class Manager {
                 case EditBox editBox -> Optional.ofNullable(entry.get(editBox)).orElseGet(() -> {
                     Document document;
                     try (var editBoxTextStore = new EditBoxACP(window, editBox)) {
+                        document = new Document(threadManager, clientId, editBoxTextStore.getPointer());
+                    }
+                    entry.put(editBox, document);
+                    return document;
+                }).documentMgrPtr;
+                case MultiLineEditBox editBox -> Optional.ofNullable(entry.get(editBox)).orElseGet(() -> {
+                    Document document;
+                    try (var editBoxTextStore = new MultiLineEditBoxACP(window, editBox)) {
                         document = new Document(threadManager, clientId, editBoxTextStore.getPointer());
                     }
                     entry.put(editBox, document);

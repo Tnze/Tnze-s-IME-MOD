@@ -36,6 +36,7 @@
   "custom": {
     "loom:injected_interfaces": {
       "net/minecraft/client/gui/components/EditBox": ["tech/tnze/client/ACPSinkRegister"],
+      "net/minecraft/client/gui/components/MultiLineEditBox": ["tech/tnze/client/ACPSinkRegister"],
       "net/minecraft/client/gui/screens/inventory/AbstractSignEditScreen": ["tech/tnze/client/ACPSinkRegister"]
     }
   }

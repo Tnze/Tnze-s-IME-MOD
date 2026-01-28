@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import tech.tnze.client.ACPSinkRegister;
-import tech.tnze.client.AbstractTextFieldACP;
+import tech.tnze.client.AbstractEditBoxACP;
 import tech.tnze.msctf.windows.win32.ui.textservices.ITextStoreACPSink;
 import tech.tnze.msctf.windows.win32.ui.textservices.TS_TEXTCHANGE;
 import tech.tnze.msctf.windows.win32.ui.textservices.TsLayoutCode;
@@ -37,12 +37,12 @@ public abstract class EditBoxMixin implements ACPSinkRegister {
     private boolean sinkEnabled = true;
 
     @Override
-    public void tnze$registerACPSink(AbstractTextFieldACP acpImpl, ITextStoreACPSink sink) {
+    public void tnze$registerACPSink(AbstractEditBoxACP acpImpl, ITextStoreACPSink sink) {
         textStoreSink = sink;
     }
 
     @Override
-    public void tnze$unregisterACPSink(AbstractTextFieldACP acpImpl, ITextStoreACPSink sink) {
+    public void tnze$unregisterACPSink(AbstractEditBoxACP acpImpl, ITextStoreACPSink sink) {
         assert sink.equals(textStoreSink);
         textStoreSink = null;
     }

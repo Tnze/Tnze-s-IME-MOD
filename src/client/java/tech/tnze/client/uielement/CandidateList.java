@@ -14,7 +14,6 @@ import org.jspecify.annotations.NonNull;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
-import java.util.function.Consumer;
 
 import static java.lang.foreign.ValueLayout.*;
 import static java.lang.foreign.ValueLayout.JAVA_CHAR;
@@ -34,6 +33,8 @@ import static tech.tnze.msctf.windows.win32.foundation.Constants.E_NOINTERFACE;
 import static tech.tnze.msctf.windows.win32.ui.textservices.Constants.TF_DEFAULT_SELECTION;
 import static tech.tnze.msctf.windows.win32.ui.textservices.TF_CONTEXT_EDIT_CONTEXT_FLAGS.TF_ES_ASYNCDONTCARE;
 import static tech.tnze.msctf.windows.win32.ui.textservices.TF_CONTEXT_EDIT_CONTEXT_FLAGS.TF_ES_READ;
+
+import static tech.tnze.client.IMEClient.LOGGER;
 
 public class CandidateList implements Renderable {
 
@@ -165,6 +166,8 @@ public class CandidateList implements Renderable {
             } finally {
                 documentMgr.Release();
             }
+        } catch (WindowsException ex) {
+            LOGGER.error("Failed to get position", ex);
         }
     }
 

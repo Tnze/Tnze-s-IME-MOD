@@ -4,11 +4,11 @@
   "package": "tech.tnze.mixin.client",
   "compatibilityLevel": "JAVA_23",
   "client": [
-    "BookEditScreenMixin",
-    "EditBoxMixin",
-    "GameRendererMixin",
     "MinecraftMixin",
-    "ScreenMixin"
+    "GameRendererMixin",
+    "ScreenMixin",
+    "EditBoxMixin",
+    "MultiLineEditBoxMixin"
   ],
   "injectors": {
     "defaultRequire": 1
