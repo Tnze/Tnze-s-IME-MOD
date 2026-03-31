@@ -87,8 +87,8 @@ public abstract class EditBoxMixin implements ACPSinkRegister {
         }
     }
 
-    @Inject(method = "setCursorPosition", at = @At("TAIL"))
-    public void tnze$setCursorPosition(int i, CallbackInfo ci) {
+    @Inject(method = "moveCursorTo(IZ)V", at = @At("TAIL"))
+    public void tnze$moveCursorTo(int position, boolean selecting, CallbackInfo ci) {
         if (textStoreSink != null && sinkEnabled) {
             checkResult(textStoreSink.OnSelectionChange());
         }
